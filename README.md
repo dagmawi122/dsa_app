@@ -2,6 +2,9 @@
 
 DSA competition platform
 
+The app owns the problem model, test cases, Monaco editor, Judge0 integration,
+and submission history. It does not import or override LMS code.
+
 ### Installation
 
 You can install this app using the [bench](https://github.com/frappe/bench) CLI:
@@ -11,6 +14,19 @@ cd $PATH_TO_YOUR_BENCH
 bench get-app $URL_OF_THIS_REPO --branch develop
 bench install-app dsa
 ```
+
+Judge0 defaults to the public CE instance. For a private Judge0 deployment, add
+this to your site's `site_config.json`:
+
+```json
+{
+  "judge0_url": "https://judge0.example.com"
+}
+```
+
+After installation, create `DSAProblem` records in Desk and open **DSA
+Practice** from the Apps screen. The current editor supports C++ (Judge0
+language ID 54).
 
 ### Contributing
 

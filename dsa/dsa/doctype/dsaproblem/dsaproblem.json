@@ -1,0 +1,29 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["title", "difficulty", "description", "examples", "constraints", "code_section", "custom_starter_code", "custom_wrapper_code", "test_cases"],
+ "fields": [
+  {"fieldname": "title", "fieldtype": "Data", "in_list_view": 1, "label": "Title", "reqd": 1},
+  {"fieldname": "difficulty", "fieldtype": "Select", "in_list_view": 1, "label": "Difficulty", "options": "easy\nmedium\nhard", "reqd": 1},
+  {"fieldname": "description", "fieldtype": "Text Editor", "label": "Description", "reqd": 1},
+  {"fieldname": "examples", "fieldtype": "Text Editor", "label": "Examples"},
+  {"fieldname": "constraints", "fieldtype": "Text Editor", "label": "Constraints"},
+  {"fieldname": "code_section", "fieldtype": "Section Break", "label": "Code"},
+  {"fieldname": "custom_starter_code", "fieldtype": "Code", "label": "Starter Code", "options": "C++"},
+  {"fieldname": "custom_wrapper_code", "fieldtype": "Code", "label": "Wrapper Code", "options": "C++"},
+  {"fieldname": "test_cases", "fieldtype": "Table", "label": "Test Cases", "options": "TestCase", "reqd": 1}
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "module": "DSA",
+ "name": "DSAProblem",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1}
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

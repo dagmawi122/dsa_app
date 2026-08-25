@@ -1,0 +1,9 @@
+{
+	"name": "dsa",
+	"private": true,
+	"version": "0.0.1",
+	"dependencies": {
+		"monaco-editor": "^0.56.0",
+		"vue": "^3.5.27"
+	}
+}
