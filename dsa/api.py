@@ -12,6 +12,13 @@ from frappe.utils import cint
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
 PENDING_STATUS_IDS = {1, 2}
+USER_CODE_MARKER = "{{USER_CODE}}"
+LANGUAGE_CODE_FIELDS = {
+	54: ("custom_starter_code", "custom_wrapper_code"),
+	71: ("custom_python_starter_code", "custom_python_wrapper_code"),
+	63: ("custom_javascript_starter_code", "custom_javascript_wrapper_code"),
+	62: ("custom_java_starter_code", "custom_java_wrapper_code"),
+}
 
 
 def _require_login() -> str:
@@ -67,7 +74,34 @@ def _get_judge0_submission(token: str) -> dict[str, Any]:
 	return result
 
 
+def _language_code_fields(language_id: int) -> tuple[str, str]:
+	language_id = cint(language_id)
+	if language_id not in LANGUAGE_CODE_FIELDS:
+		frappe.throw(_("This programming language is not supported."))
+	return LANGUAGE_CODE_FIELDS[language_id]
+
+
+def _build_source_code(
+	problem: "frappe.model.document.Document", user_code: str, language_id: int
+) -> str:
+	"""Insert editor code into the problem's hidden, language-specific wrapper."""
+	_wrapper_field = _language_code_fields(language_id)[1]
+	wrapper = problem.get(_wrapper_field) or ""
+	if not wrapper.strip():
+		# A blank wrapper keeps existing full-program problems working.
+		return user_code
+	if USER_CODE_MARKER not in wrapper:
+		frappe.throw(
+			_("The wrapper code for this language must contain {0}.").format(USER_CODE_MARKER)
+		)
+	return wrapper.replace(USER_CODE_MARKER, user_code, 1)
+
+
 def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any]:
+	starter_codes = {
+		str(language_id): problem.get(starter_field) or ""
+		for language_id, (starter_field, _wrapper_field) in LANGUAGE_CODE_FIELDS.items()
+	}
 	return {
 		"name": problem.name,
 		"title": problem.title,
@@ -75,7 +109,8 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 		"difficulty": problem.difficulty,
 		"examples": problem.examples,
 		"constraints": problem.constraints,
-		"starter_code": problem.custom_starter_code or "",
+		"starter_code": starter_codes[str(DEFAULT_LANGUAGE_ID)],
+		"starter_codes": starter_codes,
 		"test_cases": [
 			{"index": index, "input": row.custom_input or ""}
 			for index, row in enumerate(problem.test_cases, start=1)
@@ -105,6 +140,18 @@ def get_problem(name: str) -> dict[str, Any]:
 def get_submissions(problem: str) -> list[dict[str, Any]]:
 	"""Return only the signed-in user's submissions for the selected problem."""
 	user = _require_login()
+	# Recover submissions whose browser polling was interrupted by a refresh,
+	# navigation, closed tab, or stale frontend bundle.
+	unfinished = frappe.get_all(
+		"DSA Submission",
+		filters={"problem": problem, "member": user, "status": ["in", ["Queued", "Running"]]},
+		pluck="name",
+		order_by="creation desc",
+		limit_page_length=10,
+	)
+	for submission_name in unfinished:
+		_refresh_submission(frappe.get_doc("DSA Submission", submission_name))
+
 	return frappe.get_all(
 		"DSA Submission",
 		filters={"problem": problem, "member": user},
@@ -122,11 +169,16 @@ def get_submissions(problem: str) -> list[dict[str, Any]]:
 
 
 @frappe.whitelist(methods=["POST"])
-def run_code(code: str, stdin: str = "", language_id: int = DEFAULT_LANGUAGE_ID) -> dict[str, Any]:
+def run_code(
+	problem: str, code: str, stdin: str = "", language_id: int = DEFAULT_LANGUAGE_ID
+) -> dict[str, Any]:
 	_require_login()
 	if not code or not code.strip():
 		frappe.throw(_("Enter some code before running it."))
-	return {"token": _create_judge0_submission(code, stdin or "", cint(language_id))}
+	language_id = cint(language_id)
+	problem_doc = frappe.get_doc("DSAProblem", problem)
+	source_code = _build_source_code(problem_doc, code, language_id)
+	return {"token": _create_judge0_submission(source_code, stdin or "", language_id)}
 
 
 @frappe.whitelist()
@@ -155,12 +207,14 @@ def submit_code(problem: str, code: str, language_id: int = DEFAULT_LANGUAGE_ID)
 	problem_doc = frappe.get_doc("DSAProblem", problem)
 	if not problem_doc.test_cases:
 		frappe.throw(_("This problem does not have any test cases."))
+	language_id = cint(language_id)
+	source_code = _build_source_code(problem_doc, code, language_id)
 
 	submission = frappe.new_doc("DSA Submission")
 	submission.problem = problem_doc.name
 	submission.member = user
 	submission.code = code
-	submission.language_id = cint(language_id)
+	submission.language_id = language_id
 	submission.status = "Queued"
 	for index, test_case in enumerate(problem_doc.test_cases, start=1):
 		submission.append(
@@ -170,7 +224,7 @@ def submit_code(problem: str, code: str, language_id: int = DEFAULT_LANGUAGE_ID)
 				"input": test_case.custom_input or "",
 				"expected_output": test_case.custom_expected_output or "",
 				"token": _create_judge0_submission(
-					code, test_case.custom_input or "", cint(language_id)
+					source_code, test_case.custom_input or "", language_id
 				),
 				"status": "Queued",
 			},
@@ -184,13 +238,7 @@ def _normalized_output(value: str | None) -> str:
 	return (value or "").replace("\r\n", "\n").rstrip()
 
 
-@frappe.whitelist()
-def get_submission_result(submission: str) -> dict[str, Any]:
-	user = _require_login()
-	doc = frappe.get_doc("DSA Submission", submission)
-	if doc.member != user and "System Manager" not in frappe.get_roles(user):
-		frappe.throw(_("You cannot view this submission."), frappe.PermissionError)
-
+def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]:
 	pending = False
 	passed = 0
 	public_results = []
@@ -253,3 +301,12 @@ def get_submission_result(submission: str) -> dict[str, Any]:
 		"total_count": doc.total_count,
 		"results": public_results,
 	}
+
+
+@frappe.whitelist()
+def get_submission_result(submission: str) -> dict[str, Any]:
+	user = _require_login()
+	doc = frappe.get_doc("DSA Submission", submission)
+	if doc.member != user and "System Manager" not in frappe.get_roles(user):
+		frappe.throw(_("You cannot view this submission."), frappe.PermissionError)
+	return _refresh_submission(doc)

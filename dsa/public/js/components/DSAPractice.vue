@@ -6,8 +6,6 @@
 			<div class="dsa-pane dsa-problem-pane">
 				<nav class="dsa-tabbar" :aria-label="__('Problem navigation')">
 					<button type="button" class="dsa-tab" :class="{ 'is-active': activeProblemTab === 'description' }" @click="selectProblemTab('description')"><span class="dsa-tab-icon blue">▣</span>{{ __("Description") }}</button>
-					<button type="button" class="dsa-tab" :class="{ 'is-active': activeProblemTab === 'editorial' }" @click="selectProblemTab('editorial')"><span class="dsa-tab-icon amber">□</span>{{ __("Editorial") }}</button>
-					<button type="button" class="dsa-tab" :class="{ 'is-active': activeProblemTab === 'solutions' }" @click="selectProblemTab('solutions')"><span class="dsa-tab-icon blue">♦</span>{{ __("Solutions") }}</button>
 					<button type="button" class="dsa-tab" :class="{ 'is-active': activeProblemTab === 'submissions' }" @click="selectProblemTab('submissions')"><span class="dsa-tab-icon blue">↶</span>{{ __("Submissions") }}</button>
 				</nav>
 				<div v-if="activeProblemTab === 'description'" class="dsa-statement">
@@ -22,21 +20,15 @@
 					<section><h3>{{ __("Examples") }}</h3><div class="dsa-rich-text" v-html="safeExamples"></div></section>
 					<section><h3>{{ __("Constraints") }}</h3><div class="dsa-rich-text" v-html="safeConstraints"></div></section>
 				</div>
-				<div v-else-if="activeProblemTab === 'editorial'" class="dsa-tab-content dsa-tab-empty">
-					<div><h2>{{ __("Editorial") }}</h2><p>{{ __("An editorial has not been added for this problem yet.") }}</p></div>
-				</div>
 				<div v-else class="dsa-tab-content">
 					<div class="dsa-content-heading">
-						<h2>{{ activeProblemTab === "solutions" ? __("My accepted solutions") : __("My submissions") }}</h2>
+						<h2>{{ __("My submissions") }}</h2>
 						<button type="button" :disabled="submissionsLoading" @click="loadSubmissions">{{ __("Refresh") }}</button>
 					</div>
 					<div v-if="submissionsLoading" class="dsa-tab-empty">{{ __("Loading…") }}</div>
-					<div v-else-if="!visibleSubmissions.length" class="dsa-tab-empty">
-						{{ activeProblemTab === "solutions" ? __("No accepted solutions yet.") : __("No submissions yet.") }}
-					</div>
-					<article v-for="submission in visibleSubmissions" v-else :key="submission.name" class="dsa-submission-card">
+					<div v-else-if="!submissions.length" class="dsa-tab-empty">{{ __("No submissions yet.") }}</div>
+					<article v-for="submission in submissions" v-else :key="submission.name" class="dsa-submission-card">
 						<div><strong :class="submission.status.toLowerCase()">{{ submission.status }}</strong><span>{{ submission.passed_count }}/{{ submission.total_count }} {{ __("passed") }}</span><time>{{ submission.creation }}</time></div>
-						<pre v-if="activeProblemTab === 'solutions'">{{ submission.code }}</pre>
 					</article>
 				</div>
 			</div>
@@ -165,15 +157,13 @@ const safeConstraints = computed(() => sanitize(problem.value?.constraints));
 const panelStyle = computed(() => ({ "--left-panel-width": `${leftPanelWidth.value}%` }));
 const selectedLanguage = computed(() => languages.find((language) => language.id === selectedLanguageId.value) || languages[0]);
 const activeTestResult = computed(() => testResults.value[activeResultCaseIndex.value] || null);
-const visibleSubmissions = computed(() =>
-	activeProblemTab.value === "solutions"
-		? submissions.value.filter((submission) => submission.status === "Accepted")
-		: submissions.value
-);
 
 function changeLanguage() {
 	codeDrafts[previousLanguageId] = code.value;
-	code.value = codeDrafts[selectedLanguageId.value] ?? selectedLanguage.value.starter;
+	code.value =
+		codeDrafts[selectedLanguageId.value] ??
+		problem.value?.starter_codes?.[selectedLanguageId.value] ??
+		selectedLanguage.value.starter;
 	previousLanguageId = selectedLanguageId.value;
 	clearResults();
 }
@@ -193,7 +183,7 @@ function clearResults() {
 
 async function selectProblemTab(tab) {
 	activeProblemTab.value = tab;
-	if (["solutions", "submissions"].includes(tab)) await loadSubmissions();
+	if (tab === "submissions") await loadSubmissions();
 }
 
 async function loadSubmissions() {
@@ -269,10 +259,12 @@ async function loadProblem(name) {
 	if (!name) return;
 	generation += 1;
 	problem.value = await call("dsa.api.get_problem", { name });
-	code.value = problem.value.starter_code || "";
 	selectedLanguageId.value = 54;
 	previousLanguageId = 54;
-	codeDrafts = { 54: code.value };
+	codeDrafts = Object.fromEntries(
+		Object.entries(problem.value.starter_codes || {}).filter(([, starterCode]) => starterCode)
+	);
+	code.value = codeDrafts[54] || problem.value.starter_code || languages[0].starter;
 	testCases.value = (problem.value.test_cases || []).map((testCase) => ({ key: nextTestCaseKey++, input: testCase.input }));
 	if (!testCases.value.length) testCases.value = [{ key: nextTestCaseKey++, input: "" }];
 	activeTestCaseIndex.value = 0;
@@ -309,7 +301,16 @@ async function runCode() {
 	activeResultTab.value = "result";
 	try {
 		const input = testCases.value[activeTestCaseIndex.value]?.input || "";
-		const queued = await call("dsa.api.run_code", { code: code.value, stdin: input, language_id: selectedLanguageId.value }, "POST");
+		const queued = await call(
+			"dsa.api.run_code",
+			{
+				problem: problem.value.name,
+				code: code.value,
+				stdin: input,
+				language_id: selectedLanguageId.value,
+			},
+			"POST"
+		);
 		for (let attempt = 0; attempt < 60 && generation === currentGeneration; attempt += 1) {
 			const result = await call("dsa.api.get_run_result", { token: queued.token });
 			if (!result.pending) {
