@@ -308,6 +308,7 @@ async function runCode() {
 				code: code.value,
 				stdin: input,
 				language_id: selectedLanguageId.value,
+				test_case_index: activeTestCaseIndex.value + 1,
 			},
 			"POST"
 		);
@@ -320,6 +321,7 @@ async function runCode() {
 					index: activeTestCaseIndex.value + 1,
 					status: result.status,
 					input,
+					expected_output: result.expected_output,
 					actual_output: result.stdout,
 					error: result.compile_output || result.stderr || result.message,
 				}];

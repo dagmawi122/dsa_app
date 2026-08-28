@@ -46,12 +46,16 @@ def _judge0_request(method: str, path: str, **kwargs) -> dict[str, Any]:
 		frappe.log_error(frappe.get_traceback(), "Judge0 request failed")
 		frappe.throw(_("The code runner is currently unavailable: {0}").format(str(exc)))
 
-
-def _create_judge0_submission(code: str, stdin: str, language_id: int) -> str:
+def _create_judge0_submission(
+	code: str, stdin: str, language_id: int, expected_output: str | None = None
+) -> str:
+	payload = {"source_code": code, "stdin": stdin, "language_id": language_id}
+	if expected_output is not None:
+		payload["expected_output"] = expected_output
 	result = _judge0_request(
 		"POST",
 		"/submissions?base64_encoded=false&wait=false",
-		json={"source_code": code, "stdin": stdin, "language_id": language_id},
+		json=payload,
 	)
 	if not result.get("token"):
 		frappe.throw(_("The code runner did not return a submission token."))
@@ -61,9 +65,9 @@ def _create_judge0_submission(code: str, stdin: str, language_id: int) -> str:
 def _get_judge0_submission(token: str) -> dict[str, Any]:
 	result = _judge0_request(
 		"GET",
-		f"/submissions/{token}?base64_encoded=true&fields=stdout,stderr,compile_output,message,status,time,memory",
+		f"/submissions/{token}?base64_encoded=true&fields=stdout,stderr,compile_output,message,expected_output,status,time,memory",
 	)
-	for fieldname in ("stdout", "stderr", "compile_output", "message"):
+	for fieldname in ("stdout", "stderr", "compile_output", "message", "expected_output"):
 		value = result.get(fieldname)
 		if value:
 			try:
@@ -95,6 +99,19 @@ def _build_source_code(
 			_("The wrapper code for this language must contain {0}.").format(USER_CODE_MARKER)
 		)
 	return wrapper.replace(USER_CODE_MARKER, user_code, 1)
+
+
+def _official_expected_output(
+	problem: "frappe.model.document.Document", stdin: str, test_case_index: int | None
+) -> str | None:
+	"""Return the expected output only when Run is using an unchanged official case."""
+	index = cint(test_case_index)
+	if index < 1 or index > len(problem.test_cases):
+		return None
+	test_case = problem.test_cases[index - 1]
+	if _normalized_output(stdin) != _normalized_output(test_case.custom_input):
+		return None
+	return test_case.custom_expected_output or ""
 
 
 def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any]:
@@ -170,7 +187,11 @@ def get_submissions(problem: str) -> list[dict[str, Any]]:
 
 @frappe.whitelist(methods=["POST"])
 def run_code(
-	problem: str, code: str, stdin: str = "", language_id: int = DEFAULT_LANGUAGE_ID
+	problem: str,
+	code: str,
+	stdin: str = "",
+	language_id: int = DEFAULT_LANGUAGE_ID,
+	test_case_index: int | None = None,
 ) -> dict[str, Any]:
 	_require_login()
 	if not code or not code.strip():
@@ -178,7 +199,12 @@ def run_code(
 	language_id = cint(language_id)
 	problem_doc = frappe.get_doc("DSAProblem", problem)
 	source_code = _build_source_code(problem_doc, code, language_id)
-	return {"token": _create_judge0_submission(source_code, stdin or "", language_id)}
+	expected_output = _official_expected_output(problem_doc, stdin or "", test_case_index)
+	return {
+		"token": _create_judge0_submission(
+			source_code, stdin or "", language_id, expected_output=expected_output
+		)
+	}
 
 
 @frappe.whitelist()
@@ -186,10 +212,19 @@ def get_run_result(token: str) -> dict[str, Any]:
 	_require_login()
 	result = _get_judge0_submission(token)
 	status = result.get("status") or {}
+	pending = status.get("id") in PENDING_STATUS_IDS
+	status_description = status.get("description")
+	if not pending and result.get("expected_output") is not None:
+		outputs_match = _normalized_output(result.get("stdout")) == _normalized_output(
+			result.get("expected_output")
+		)
+		if status.get("id") == 3 and not outputs_match:
+			status_description = "Wrong Answer"
 	return {
-		"pending": status.get("id") in PENDING_STATUS_IDS,
-		"status": status.get("description"),
+		"pending": pending,
+		"status": status_description,
 		"stdout": result.get("stdout"),
+		"expected_output": result.get("expected_output"),
 		"stderr": result.get("stderr"),
 		"compile_output": result.get("compile_output"),
 		"message": result.get("message"),
@@ -224,7 +259,10 @@ def submit_code(problem: str, code: str, language_id: int = DEFAULT_LANGUAGE_ID)
 				"input": test_case.custom_input or "",
 				"expected_output": test_case.custom_expected_output or "",
 				"token": _create_judge0_submission(
-					source_code, test_case.custom_input or "", language_id
+					source_code,
+					test_case.custom_input or "",
+					language_id,
+					expected_output=test_case.custom_expected_output or "",
 				),
 				"status": "Queued",
 			},
