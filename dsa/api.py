@@ -7,7 +7,9 @@ from typing import Any
 import frappe
 import requests
 from frappe import _
-from frappe.utils import cint
+from frappe.utils import cint, now_datetime
+
+from dsa.dsa.doctype.contest.contest import get_contest_status
 
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
@@ -151,6 +153,41 @@ def get_problems() -> list[dict[str, Any]]:
 def get_problem(name: str) -> dict[str, Any]:
 	_require_login()
 	return _problem_payload(frappe.get_doc("DSAProblem", name))
+
+
+def _contest_payload(contest, current_time=None) -> dict[str, Any]:
+	return {
+		"name": contest.name,
+		"title": contest.title,
+		"description": contest.description,
+		"start_date": contest.start_date,
+		"end_date": contest.end_date,
+		"status": get_contest_status(contest.start_date, contest.end_date, current_time),
+	}
+
+
+@frappe.whitelist()
+def get_contests(limit_start: int = 0, limit_page_length: int = 20) -> list[dict[str, Any]]:
+	"""List contests in chronological order with status calculated at request time."""
+	_require_login()
+	limit_start = max(cint(limit_start), 0)
+	limit_page_length = min(max(cint(limit_page_length), 1), 100)
+	current_time = now_datetime()
+	contests = frappe.get_all(
+		"Contest",
+		fields=["name", "title", "description", "start_date", "end_date"],
+		order_by="start_date asc",
+		offset=limit_start,
+		limit=limit_page_length,
+	)
+	return [_contest_payload(contest, current_time) for contest in contests]
+
+
+@frappe.whitelist()
+def get_contest(name: str) -> dict[str, Any]:
+	"""Fetch one contest with status calculated at request time."""
+	_require_login()
+	return _contest_payload(frappe.get_doc("Contest", name), now_datetime())
 
 
 @frappe.whitelist()
