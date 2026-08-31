@@ -1,0 +1,61 @@
+{
+  "doctype": "DocType",
+  "name": "Contest Registration",
+  "module": "DSA",
+  "autoname": "format:REG-{#####}",
+  "field_order": [
+    "user",
+    "contest",
+    "joined_at",
+    "status"
+  ],
+  "fields": [
+    {
+      "fieldname": "user",
+      "fieldtype": "Link",
+      "label": "User",
+      "options": "User",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "contest",
+      "fieldtype": "Link",
+      "label": "Contest",
+      "options": "Contest",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "joined_at",
+      "fieldtype": "Datetime",
+      "label": "Joined At",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "label": "Status",
+      "options": "Joined\nLeft",
+      "default": "Joined",
+      "reqd": 1,
+      "in_list_view": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "create": 1,
+      "delete": 1,
+      "read": 1,
+      "write": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1
+    }
+  ],
+  "sort_field": "joined_at",
+  "sort_order": "DESC",
+  "track_changes": 1
+}
