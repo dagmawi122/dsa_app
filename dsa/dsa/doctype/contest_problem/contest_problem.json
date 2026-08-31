@@ -1,0 +1,37 @@
+{
+ "doctype": "DocType",
+ "name": "Contest Problem",
+ "module": "DSA",
+ "istable": 1,
+ "editable_grid": 1,
+ "field_order": [
+  "problem",
+  "order",
+  "points"
+ ],
+ "fields": [
+  {
+   "fieldname": "problem",
+   "fieldtype": "Link",
+   "label": "Problem",
+   "options": "DSAProblem",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "order",
+   "fieldtype": "Int",
+   "label": "Order",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "points",
+   "fieldtype": "Int",
+   "label": "Points",
+   "reqd": 1,
+   "in_list_view": 1
+  }
+ ]
+}
+
