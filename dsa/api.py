@@ -155,39 +155,69 @@ def get_problem(name: str) -> dict[str, Any]:
 	return _problem_payload(frappe.get_doc("DSAProblem", name))
 
 
-def _contest_payload(contest, current_time=None) -> dict[str, Any]:
-	return {
-		"name": contest.name,
-		"title": contest.title,
-		"description": contest.description,
-		"start_date": contest.start_date,
-		"end_date": contest.end_date,
-		"status": get_contest_status(contest.start_date, contest.end_date, current_time),
-	}
+def _contest_payload(contest, current_time=None, include_problems=False) -> dict[str, Any]:
+    payload = {
+        "name": contest.name,
+        "title": contest.title,
+        "description": contest.description,
+        "start_date": contest.start_date,
+        "end_date": contest.end_date,
+        "status": get_contest_status(
+            contest.start_date,
+            contest.end_date,
+            current_time
+        ),
+    }
+
+    if include_problems:
+        payload["problems"] = [
+            {
+                "problem": row.problem,
+                "order": row.order,
+                "points": row.points,
+            }
+            for row in (contest.problems or [])
+        ]
+
+    return payload
 
 
 @frappe.whitelist()
 def get_contests(limit_start: int = 0, limit_page_length: int = 20) -> list[dict[str, Any]]:
-	"""List contests in chronological order with status calculated at request time."""
-	_require_login()
-	limit_start = max(cint(limit_start), 0)
-	limit_page_length = min(max(cint(limit_page_length), 1), 100)
-	current_time = now_datetime()
-	contests = frappe.get_all(
-		"Contest",
-		fields=["name", "title", "description", "start_date", "end_date"],
-		order_by="start_date asc",
-		offset=limit_start,
-		limit=limit_page_length,
-	)
-	return [_contest_payload(contest, current_time) for contest in contests]
+    """List contests in chronological order with status calculated at request time."""
+    _require_login()
+
+    limit_start = max(cint(limit_start), 0)
+    limit_page_length = min(max(cint(limit_page_length), 1), 100)
+
+    current_time = now_datetime()
+
+    contests = frappe.get_all(
+        "Contest",
+        fields=["name", "title", "description", "start_date", "end_date"],
+        order_by="start_date asc",
+        offset=limit_start,
+        limit=limit_page_length,
+    )
+
+    return [
+        _contest_payload(contest, current_time)
+        for contest in contests
+    ]
 
 
 @frappe.whitelist()
 def get_contest(name: str) -> dict[str, Any]:
-	"""Fetch one contest with status calculated at request time."""
-	_require_login()
-	return _contest_payload(frappe.get_doc("Contest", name), now_datetime())
+    """Fetch one contest with its problems."""
+    _require_login()
+
+    contest = frappe.get_doc("Contest", name)
+
+    return _contest_payload(
+        contest,
+        now_datetime(),
+        include_problems=True
+    )
 
 
 @frappe.whitelist()
