@@ -8,10 +8,16 @@ class DSAPracticePage {
 			title: __("DSA Practice"),
 			single_column: true,
 		});
+
 		this.page.main.closest(".container").addClass("dsa-page-container");
+
 		this.mountPoint = document.createElement("div");
 		this.page.main[0].appendChild(this.mountPoint);
-		this.app = createApp(DSAPractice, { page: this.page });
+
+		this.app = createApp(DSAPractice, {
+			page: this.page,
+		});
+
 		this.component = this.app.mount(this.mountPoint);
 	}
 
@@ -25,4 +31,44 @@ class DSAPracticePage {
 	}
 }
 
-window.dsa = { DSAPractice: DSAPracticePage };
+class ContestProblemPage {
+	constructor(wrapper) {
+		const route = frappe.get_route();
+
+		this.contestName = route[1];
+		this.problemName = route[2];
+
+		this.page = frappe.ui.make_app_page({
+			parent: wrapper,
+			title: __("Contest Problem"),
+			single_column: true,
+		});
+
+		this.page.main.closest(".container").addClass("dsa-page-container");
+
+		this.mountPoint = document.createElement("div");
+		this.page.main[0].appendChild(this.mountPoint);
+
+		this.app = createApp(DSAPractice, {
+			page: this.page,
+			contestMode: true,
+			problemName: this.problemName,
+		});
+
+		this.component = this.app.mount(this.mountPoint);
+	}
+
+	refresh() {
+		this.component?.refresh?.();
+	}
+
+	dispose() {
+		this.app?.unmount();
+		this.app = null;
+	}
+}
+
+window.dsa = {
+	DSAPractice: DSAPracticePage,
+	ContestProblem: ContestProblemPage,
+};

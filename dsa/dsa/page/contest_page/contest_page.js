@@ -93,6 +93,8 @@ class ContestPage {
 
                     </div>
 
+                    
+
                     <div class="hero-decoration">
 
                         <div class="code-symbol">
@@ -731,6 +733,13 @@ class ContestPage {
 
                     </p>
 
+                    <button
+                        class="contest-join-btn"
+                        data-contest="${this.escape_html(contest.name)}"
+                    >
+                        Join Contest
+                    </button>
+
                 </div>
 
 
@@ -1116,6 +1125,19 @@ class ContestPage {
 
                 frappe.set_route(
                     "contest-page"
+                );
+
+            }
+        );
+
+
+        $(".contest-join-btn").on(
+            "click",
+            () => {
+
+                frappe.set_route(
+                    "contest-comp",
+                    this.contest_name
                 );
 
             }
@@ -3333,6 +3355,58 @@ class ContestPage {
         pointer;
 }
 
+.contest-join-btn {
+
+    margin-top:
+        25px;
+
+    padding:
+        12px 26px;
+
+    border:
+        none;
+
+    border-radius:
+        8px;
+
+    background:
+        #ffc107;
+
+    color:
+        #111111;
+
+    font-size:
+        13px;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.2px;
+
+    cursor:
+        pointer;
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease;
+}
+
+
+.contest-join-btn:hover {
+
+    background:
+        #ffca28;
+
+    transform:
+        translateY(-1px);
+
+    box-shadow:
+        0 6px 20px
+        rgba(255, 193, 7, 0.18);
+}
+
 
 /* =========================================================
    RESPONSIVE
@@ -3524,6 +3598,8 @@ class ContestPage {
             45px;
 
     }
+
+    
 
 }
 
