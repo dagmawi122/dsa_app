@@ -3,16 +3,25 @@
   "doctype": "DocType",
   "engine": "InnoDB",
   "field_order": [
+    "contest",
     "problem",
     "member",
-    "status",
-    "language_id",
+    "dsa_submission",
     "code",
-    "passed_count",
-    "total_count",
-    "results"
+    "language_id",
+    "status",
+    "score",
+    "submission_time"
   ],
   "fields": [
+    {
+      "fieldname": "contest",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Contest",
+      "options": "Contest",
+      "reqd": 1
+    },
     {
       "fieldname": "problem",
       "fieldtype": "Link",
@@ -30,18 +39,10 @@
       "reqd": 1
     },
     {
-      "fieldname": "status",
-      "fieldtype": "Select",
-      "in_list_view": 1,
-      "label": "Status",
-      "options": "Queued\nRunning\nAccepted\nWrong Answer\nTime Limit Exceeded\nCompilation Error\nRuntime Error\nFailed",
-      "read_only": 1
-    },
-    {
-      "default": "54",
-      "fieldname": "language_id",
-      "fieldtype": "Int",
-      "label": "Judge0 Language ID",
+      "fieldname": "dsa_submission",
+      "fieldtype": "Link",
+      "label": "DSA Submission",
+      "options": "DSA Submission",
       "read_only": 1
     },
     {
@@ -52,30 +53,38 @@
       "read_only": 1
     },
     {
-      "default": "0",
-      "fieldname": "passed_count",
+      "fieldname": "language_id",
       "fieldtype": "Int",
-      "label": "Passed",
+      "label": "Language ID",
+      "read_only": 1
+    },
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Status",
+      "options": "Queued\nRunning\nAccepted\nWrong Answer\nTime Limit Exceeded\nCompilation Error\nRuntime Error\nFailed",
       "read_only": 1
     },
     {
       "default": "0",
-      "fieldname": "total_count",
+      "fieldname": "score",
       "fieldtype": "Int",
-      "label": "Total",
+      "in_list_view": 1,
+      "label": "Score",
       "read_only": 1
     },
     {
-      "fieldname": "results",
-      "fieldtype": "Table",
-      "label": "Results",
-      "options": "DSA Submission Result",
+      "fieldname": "submission_time",
+      "fieldtype": "Datetime",
+      "in_list_view": 1,
+      "label": "Submission Time",
       "read_only": 1
     }
   ],
   "links": [],
   "module": "DSA",
-  "name": "DSA Submission",
+  "name": "Contest Submission",
   "permissions": [
     {
       "email": 1,

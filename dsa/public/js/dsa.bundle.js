@@ -52,6 +52,7 @@ class ContestProblemPage {
 		this.app = createApp(DSAPractice, {
 			page: this.page,
 			contestMode: true,
+			contestName: this.contestName,
 			problemName: this.problemName,
 		});
 
@@ -59,7 +60,17 @@ class ContestProblemPage {
 	}
 
 	refresh() {
-		this.component?.refresh?.();
+		const route = frappe.get_route();
+		const currentContest = route[1];
+		const currentProblem = route[2];
+
+		if (currentProblem && (currentProblem !== this.problemName || currentContest !== this.contestName)) {
+			this.contestName = currentContest;
+			this.problemName = currentProblem;
+			this.component?.setContestProblem?.(currentContest, currentProblem);
+		} else {
+			this.component?.refresh?.();
+		}
 	}
 
 	dispose() {

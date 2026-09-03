@@ -64,6 +64,43 @@
                         </button>
                     </div>
 
+                    <div
+    v-if="props.contestMode && contestProgress"
+    class="contest-progress"
+>
+    <div class="contest-progress-header">
+        <strong>{{ __("Contest Progress") }}</strong>
+
+        <span>
+            {{ __("Score") }}:
+            <b>{{ contestProgress.total_score || 0 }}</b>
+        </span>
+    </div>
+
+    <div class="contest-progress-stats">
+        <div class="progress-item solved">
+            <strong>
+                {{ contestProgress.solved_count || 0 }}
+            </strong>
+            <span>{{ __("Solved") }}</span>
+        </div>
+
+        <div class="progress-item attempted">
+            <strong>
+                {{ contestProgress.attempted_count || 0 }}
+            </strong>
+            <span>{{ __("Attempted") }}</span>
+        </div>
+
+        <div class="progress-item unsolved">
+            <strong>
+                {{ contestProgress.unsolved_count || 0 }}
+            </strong>
+            <span>{{ __("Unsolved") }}</span>
+        </div>
+    </div>
+</div>
+
                     <div v-if="submissionsLoading" class="dsa-tab-empty">
                         {{ __("Loading…") }}
                     </div>
@@ -73,24 +110,33 @@
                     </div>
 
                     <article
-                        v-for="submission in submissions"
-                        v-else
-                        :key="submission.name"
-                        class="dsa-submission-card"
-                    >
-                        <div>
-                            <strong :class="submission.status.toLowerCase()">
-                                {{ submission.status }}
-                            </strong>
+    v-for="submission in submissions"
+    v-else
+    :key="submission.name"
+    class="dsa-submission-card"
+     >
+    <div class="dsa-submission-main">
+        <strong
+            class="submission-status"
+            :class="statusClass(submission.status)"
+        >
+            <span>{{ statusIcon(submission.status) }}</span>
+            {{ displayStatus(submission.status) }}
+        </strong>
 
-                            <span>
-                                {{ submission.passed_count }}/{{ submission.total_count }}
-                                {{ __("passed") }}
-                            </span>
+        <span v-if="props.contestMode" class="submission-score">
+            {{ Number(submission.score || 0) }}
+            {{ __("pts") }}
+        </span>
 
-                            <time>{{ submission.creation }}</time>
-                        </div>
-                    </article>
+        <span>
+            {{ submission.passed_count }}/{{ submission.total_count }}
+            {{ __("passed") }}
+        </span>
+
+        <time>{{ formatSubmissionTime(submission) }}</time>
+              </div>
+              </article>
                 </div>
             </div>
 
@@ -365,6 +411,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    contestName: {
+        type: String,
+        default: "",
+    },
     problemName: {
         type: String,
         default: "",
@@ -418,6 +468,8 @@ const monacoEditor = ref(null);
 const practiceShell = ref(null);
 const leftPanelWidth = ref(50);
 const resizing = ref(false);
+const contestProgress = ref(null);
+const contestProgressLoading = ref(false);
 
 let generation = 0;
 let nextTestCaseKey = 2;
@@ -457,6 +509,56 @@ function formatTime(seconds) {
     return `${String(minutes).padStart(2, "0")}:${String(
         remainingSeconds
     ).padStart(2, "0")}`;
+}
+ function displayStatus(status) {
+    const normalized = String(status || "").toLowerCase();
+
+    const statusMap = {
+        accepted: __("Accepted"),
+        "wrong answer": __("Wrong Answer"),
+        "time limit exceeded": __("Time Limit Exceeded"),
+        "compilation error": __("Compilation Error"),
+        "runtime error": __("Runtime Error"),
+        failed: __("Wrong Answer"),
+        running: __("Running"),
+        queued: __("Queued"),
+    };
+
+    return statusMap[normalized] || status || __("Unknown");
+}
+
+function statusClass(status) {
+    return String(status || "")
+        .toLowerCase()
+        .replace(/\s+/g, "-");
+}
+
+function statusIcon(status) {
+    const normalized = String(status || "").toLowerCase();
+
+    if (normalized === "accepted") {
+        return "✓";
+    }
+
+    if (normalized === "running" || normalized === "queued") {
+        return "◷";
+    }
+
+    if (normalized === "time limit exceeded") {
+        return "⏰";
+    }
+
+    if (normalized === "compilation error" || normalized === "runtime error") {
+        return "!";
+    }
+
+    return "✕";
+}
+
+function formatSubmissionTime(submission) {
+    return submission.submission_time ||
+        submission.creation ||
+        "—";
 }
 
 function startTimer() {
@@ -515,6 +617,22 @@ async function loadSubmissions() {
     submissionsLoading.value = true;
 
     try {
+        if (props.contestMode) {
+            const route = frappe.get_route();
+
+            const contestName = route[1];
+
+            submissions.value = await call(
+                "dsa.api.get_contest_submissions",
+                {
+                    contest: contestName,
+                    problem: problem.value.name,
+                }
+            );
+
+            return;
+        }
+
         submissions.value = await call(
             "dsa.api.get_submissions",
             {
@@ -694,6 +812,10 @@ async function loadProblem(name) {
     activeProblemTab.value = "description";
     activeResultTab.value = "testcase";
     submissions.value = [];
+
+if (props.contestMode) {
+    await loadContestProgress();
+}
 }
 
 onMounted(async () => {
@@ -830,15 +952,28 @@ async function submitCode() {
     activeResultTab.value = "result";
 
     try {
-        const queued = await call(
-            "dsa.api.submit_code",
-            {
-                problem: problem.value.name,
-                code: code.value,
-                language_id: selectedLanguageId.value,
-            },
-            "POST"
-        );
+        const method = props.contestMode
+    ? "dsa.api.submit_contest_code"
+    : "dsa.api.submit_code";
+
+const args = props.contestMode
+    ? {
+          contest: frappe.get_route()[1],
+          problem: problem.value.name,
+          code: code.value,
+          language_id: selectedLanguageId.value,
+      }
+    : {
+          problem: problem.value.name,
+          code: code.value,
+          language_id: selectedLanguageId.value,
+      };
+
+const queued = await call(
+    method,
+    args,
+    "POST"
+);
 
         for (
             let attempt = 0;
@@ -847,20 +982,28 @@ async function submitCode() {
             attempt += 1
         ) {
             const result = await call(
-                "dsa.api.get_submission_result",
-                {
-                    submission: queued.submission,
-                }
-            );
+    props.contestMode
+        ? "dsa.api.get_contest_submission_result"
+        : "dsa.api.get_submission_result",
+    {
+        submission: props.contestMode
+            ? queued.contest_submission
+            : queued.submission,
+    }
+);
 
             overallStatus.value = result.status;
             testResults.value = result.results;
 
             if (!result.pending) {
-                await loadSubmissions();
-                return;
-            }
+    await loadSubmissions();
 
+    if (props.contestMode) {
+        await loadContestProgress();
+    }
+
+    return;
+}
             await wait(1000);
         }
 
@@ -871,6 +1014,32 @@ async function submitCode() {
         showError(error);
     } finally {
         busy.value = false;
+    }
+}
+async function loadContestProgress() {
+    if (!props.contestMode) return;
+
+    const route = frappe.get_route();
+    const contestName = route[1];
+
+    if (!contestName) return;
+
+    contestProgressLoading.value = true;
+
+    try {
+        contestProgress.value = await call(
+            "dsa.api.get_contest_progress",
+            {
+                contest: contestName,
+            }
+        );
+    } catch (error) {
+        console.error(
+            "Failed to load contest progress:",
+            error
+        );
+    } finally {
+        contestProgressLoading.value = false;
     }
 }
 
@@ -894,9 +1063,26 @@ function refresh() {
     monacoEditor.value?.layout();
 }
 
+
+async function setContestProblem(contest, newProblemName) {
+    if (!newProblemName) return;
+    loading.value = true;
+    try {
+        await loadProblem(newProblemName);
+        if (props.contestMode) {
+            await loadContestProgress();
+        }
+    } catch (error) {
+        showError(error);
+    } finally {
+        loading.value = false;
+    }
+}
+
 defineExpose({
     refresh,
     loadProblem,
+    setContestProblem,
 });
 
 onBeforeUnmount(() => {
@@ -1150,11 +1336,46 @@ onBeforeUnmount(() => {
 }
 
 .dsa-submission-card strong {
+    font-weight: 600;
+}
+
+.dsa-submission-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.submission-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.submission-status.accepted {
+    color: #42b883;
+}
+
+.submission-status.wrong-answer {
     color: #e45757;
 }
 
-.dsa-submission-card strong.accepted {
-    color: #42b883;
+.submission-status.runtime-error {
+    color: #e08b45;
+}
+
+.submission-status.compilation-error {
+    color: #d56be0;
+}
+
+.submission-status.running,
+.submission-status.queued {
+    color: #d9a52b;
+}
+
+.submission-score {
+    color: #e3b342;
+    font-weight: 600;
 }
 
 .dsa-submission-card time {
@@ -1643,6 +1864,93 @@ onBeforeUnmount(() => {
         height: 700px;
     }
 }
+.contest-progress {
+    margin-top: 22px;
+    padding: 14px;
+    border: 1px solid #414141;
+    border-radius: 8px;
+    background: #292929;
+}
+
+.contest-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    color: #ddd;
+    font-size: 12px;
+}
+
+.contest-progress-header strong {
+    color: #eee;
+}
+
+.contest-progress-header span {
+    color: #999;
+}
+
+.contest-progress-header b {
+    color: #e3b342;
+}
+
+.contest-progress-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.progress-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px;
+    border-radius: 6px;
+    background: #343434;
+}
+
+.progress-item strong {
+    font-size: 17px;
+}
+
+.progress-item span {
+    color: #888;
+    font-size: 10px;
+}
+
+.progress-item.solved strong {
+    color: #42b883;
+}
+
+.progress-item.attempted strong {
+    color: #d9a52b;
+}
+
+.progress-item.unsolved strong {
+    color: #999;
+}
+
+@media (max-width: 600px) {
+    .contest-progress-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .dsa-submission-main {
+        flex-wrap: wrap;
+    }
+
+    .dsa-submission-card time {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+.submission-status.accepted { color: #28c76f; }
+.submission-status.wrong-answer, .submission-status.failed { color: #e05757; }
+.submission-status.time-limit-exceeded { color: #ff9f43; }
+.submission-status.compilation-error { color: #ea5455; }
+.submission-status.runtime-error { color: #f5365c; }
+.submission-status.running, .submission-status.queued { color: #5e72e4; }
+
 </style>
 
 <style>

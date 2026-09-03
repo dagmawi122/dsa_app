@@ -14,6 +14,22 @@ from dsa.dsa.doctype.contest.contest import get_contest_status
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
 PENDING_STATUS_IDS = {1, 2}
+
+def _map_judge0_status(status_id: int | None, output_matches: bool) -> str:
+    if status_id in PENDING_STATUS_IDS:
+        return "Running"
+    if status_id == 3:
+        return "Accepted" if output_matches else "Wrong Answer"
+    if status_id == 4:
+        return "Wrong Answer"
+    if status_id == 5:
+        return "Time Limit Exceeded"
+    if status_id == 6:
+        return "Compilation Error"
+    if status_id in {7, 8, 9, 10, 11, 12}:
+        return "Runtime Error"
+    return "Failed"
+
 USER_CODE_MARKER = "{{USER_CODE}}"
 LANGUAGE_CODE_FIELDS = {
 	54: ("custom_starter_code", "custom_wrapper_code"),
@@ -299,44 +315,667 @@ def get_run_result(token: str) -> dict[str, Any]:
 		"memory": result.get("memory"),
 	}
 
+def _create_dsa_submission(
+    problem_doc,
+    user: str,
+    code: str,
+    language_id: int,
+):
+    """Create a DSA Submission and submit all test cases to Judge0."""
 
+    if not code or not code.strip():
+        frappe.throw(_("Enter some code before submitting it."))
+
+    if not problem_doc.test_cases:
+        frappe.throw(_("This problem does not have any test cases."))
+
+    language_id = cint(language_id)
+
+    source_code = _build_source_code(
+        problem_doc,
+        code,
+        language_id,
+    )
+
+    submission = frappe.new_doc("DSA Submission")
+
+    submission.problem = problem_doc.name
+    submission.member = user
+    submission.code = code
+    submission.language_id = language_id
+    submission.status = "Queued"
+
+    for index, test_case in enumerate(
+        problem_doc.test_cases,
+        start=1,
+    ):
+        submission.append(
+            "results",
+            {
+                "test_case_index": index,
+                "input": test_case.custom_input or "",
+                "expected_output": test_case.custom_expected_output or "",
+                "token": _create_judge0_submission(
+                    source_code,
+                    test_case.custom_input or "",
+                    language_id,
+                    expected_output=test_case.custom_expected_output or "",
+                ),
+                "status": "Queued",
+            },
+        )
+
+    submission.total_count = len(problem_doc.test_cases)
+
+    submission.insert(
+        ignore_permissions=True
+    )
+
+    return submission
+def _get_contest_problem(
+    contest: str,
+    problem: str,
+):
+    """Return the problem configuration for a contest."""
+
+    contest_problem = frappe.db.get_value(
+        "Contest Problem",
+        {
+            "parent": contest,
+            "parenttype": "Contest",
+            "problem": problem,
+        },
+        [
+            "name",
+            "problem",
+            "points",
+            "order",
+        ],
+        as_dict=True,
+    )
+
+    if not contest_problem:
+        frappe.throw(
+            _("This problem does not belong to the selected contest.")
+        )
+
+    if cint(contest_problem.points) < 0:
+        frappe.throw(
+            _("Contest problem points cannot be negative.")
+        )
+
+    return contest_problem
+
+def _require_contest_participant(contest: str, user: str):
+    """Make sure the user has joined the contest."""
+
+    registration = frappe.db.exists(
+        "Contest Registration",
+        {
+            "contest": contest,
+            "user": user,
+            "status": "Joined",
+        },
+    )
+
+    if not registration:
+        frappe.throw(
+            _("You must join this contest before submitting.")
+        )
+
+
+def _require_active_contest(contest: str):
+    """Make sure the contest is currently active."""
+
+    contest_doc = frappe.get_doc(
+        "Contest",
+        contest,
+    )
+
+    now = frappe.utils.now_datetime()
+
+    start = frappe.utils.get_datetime(
+        contest_doc.start_date
+    )
+
+    end = frappe.utils.get_datetime(
+        contest_doc.end_date
+    )
+
+    if now < start:
+        frappe.throw(
+            _("This contest has not started yet.")
+        )
+
+    if now > end:
+        frappe.throw(
+            _("This contest has already ended.")
+        )
+
+    return contest_doc
 @frappe.whitelist(methods=["POST"])
-def submit_code(problem: str, code: str, language_id: int = DEFAULT_LANGUAGE_ID) -> dict[str, Any]:
-	user = _require_login()
-	if not code or not code.strip():
-		frappe.throw(_("Enter some code before submitting it."))
+def submit_contest_code(
+    contest: str,
+    problem: str,
+    code: str,
+    language_id: int = DEFAULT_LANGUAGE_ID,
+) -> dict[str, Any]:
+    """Submit a solution for a problem inside a contest."""
 
-	problem_doc = frappe.get_doc("DSAProblem", problem)
-	if not problem_doc.test_cases:
-		frappe.throw(_("This problem does not have any test cases."))
-	language_id = cint(language_id)
-	source_code = _build_source_code(problem_doc, code, language_id)
+    user = _require_login()
 
-	submission = frappe.new_doc("DSA Submission")
-	submission.problem = problem_doc.name
-	submission.member = user
-	submission.code = code
-	submission.language_id = language_id
-	submission.status = "Queued"
-	for index, test_case in enumerate(problem_doc.test_cases, start=1):
-		submission.append(
-			"results",
-			{
-				"test_case_index": index,
-				"input": test_case.custom_input or "",
-				"expected_output": test_case.custom_expected_output or "",
-				"token": _create_judge0_submission(
-					source_code,
-					test_case.custom_input or "",
-					language_id,
-					expected_output=test_case.custom_expected_output or "",
-				),
-				"status": "Queued",
-			},
-		)
-	submission.total_count = len(problem_doc.test_cases)
-	submission.insert(ignore_permissions=True)
-	return {"submission": submission.name, "status": submission.status}
+    # 1. Contest must be active.
+    contest_doc = _require_active_contest(contest)
+
+    # 2. User must have joined the contest.
+    _require_contest_participant(
+        contest=contest,
+        user=user,
+    )
+
+    # 3. Problem must belong to the contest.
+    contest_problem = _get_contest_problem(
+        contest=contest,
+        problem=problem,
+    )
+
+    # Anti-spam cooldown check (3 seconds)
+    last_sub = frappe.db.get_value(
+        "Contest Submission",
+        {"contest": contest_doc.name, "problem": problem, "member": user},
+        "creation",
+        order_by="creation desc",
+    )
+    if last_sub:
+        if frappe.utils.time_diff_in_seconds(frappe.utils.now_datetime(), last_sub) < 3:
+            frappe.throw(_("Please wait a few seconds before submitting again."))
+
+    # 4. Load the DSA problem.
+    problem_doc = frappe.get_doc(
+        "DSAProblem",
+        problem,
+    )
+
+    # 5. Create the normal DSA submission.
+    dsa_submission = _create_dsa_submission(
+        problem_doc=problem_doc,
+        user=user,
+        code=code,
+        language_id=language_id,
+    )
+
+    # 6. Create the contest submission record.
+    contest_submission = frappe.new_doc(
+        "Contest Submission"
+    )
+
+    contest_submission.contest = contest_doc.name
+    contest_submission.problem = problem_doc.name
+    contest_submission.member = user
+    contest_submission.dsa_submission = dsa_submission.name
+    contest_submission.code = code
+    contest_submission.language_id = language_id
+    contest_submission.status = "Queued"
+    contest_submission.score = 0
+    contest_submission.submission_time = frappe.utils.now_datetime()
+
+    contest_submission.insert(
+        ignore_permissions=True
+    )
+
+    return {
+        "contest_submission": contest_submission.name,
+        "dsa_submission": dsa_submission.name,
+        "status": contest_submission.status,
+        "score": contest_submission.score,
+        "points": contest_problem.points,
+    }
+def _calculate_contest_submission_score(
+    contest: str,
+    problem: str,
+    status: str,
+) -> int:
+    """Calculate the score earned by a contest submission."""
+
+    if status != "Accepted":
+        return 0
+
+    points = frappe.db.get_value(
+        "Contest Problem",
+        {
+            "parent": contest,
+            "parenttype": "Contest",
+            "problem": problem,
+        },
+        "points",
+    )
+
+    return cint(points or 0)
+
+def _refresh_contest_submission(
+    contest_submission,
+):
+    """Refresh the linked DSA submission and update contest score."""
+
+    if not contest_submission.dsa_submission:
+        frappe.throw(
+            _("This contest submission has no linked DSA submission.")
+        )
+
+    dsa_submission = frappe.get_doc(
+        "DSA Submission",
+        contest_submission.dsa_submission,
+    )
+
+    result = _refresh_submission(
+        dsa_submission
+    )
+
+    # Keep contest submission Running while Judge0 is still processing.
+    if result["pending"]:
+        contest_submission.status = "Running"
+        contest_submission.score = 0
+    else:
+        contest_submission.status = result["status"]
+        contest_submission.score = (
+            _calculate_contest_submission_score(
+                contest=contest_submission.contest,
+                problem=contest_submission.problem,
+                status=contest_submission.status,
+            )
+        )
+
+    contest_submission.save(
+        ignore_permissions=True
+    )
+
+    return {
+        "submission": contest_submission.name,
+        "contest": contest_submission.contest,
+        "problem": contest_submission.problem,
+        "pending": result["pending"],
+        "status": contest_submission.status,
+        "score": contest_submission.score,
+        "passed_count": result["passed_count"],
+        "total_count": result["total_count"],
+        "results": result["results"],
+    }
+@frappe.whitelist()
+def get_contest_submission_result(
+    submission: str,
+) -> dict[str, Any]:
+    """Return the current result of a contest submission."""
+
+    user = _require_login()
+
+    contest_submission = frappe.get_doc(
+        "Contest Submission",
+        submission,
+    )
+
+    if (
+        contest_submission.member != user
+        and "System Manager" not in frappe.get_roles(user)
+    ):
+        frappe.throw(
+            _("You are not allowed to view this submission."),
+            frappe.PermissionError,
+        )
+
+    return _refresh_contest_submission(
+        contest_submission
+    )
+def _get_contest_score_data(
+    contest: str,
+    member: str,
+) -> dict[str, Any]:
+    """Calculate a participant's score for a contest."""
+
+    submissions = frappe.get_all(
+        "Contest Submission",
+        filters={
+            "contest": contest,
+            "member": member,
+        },
+        fields=[
+            "problem",
+            "status",
+            "score",
+            "submission_time",
+        ],
+        order_by="submission_time asc",
+    )
+
+    # Refresh submissions that are still being processed
+    for submission in submissions:
+        if submission.status in {"Queued", "Running"}:
+            contest_sub = frappe.get_doc("Contest Submission", submission.name)
+            res = _refresh_contest_submission(contest_sub)
+            submission.status = res["status"]
+            submission.score = res["score"]
+
+    problem_scores = {}
+
+    for submission in submissions:
+
+        if submission.status != "Accepted":
+            continue
+
+        score = cint(
+            submission.score or 0
+        )
+
+        current_score = problem_scores.get(
+            submission.problem,
+            0,
+        )
+
+        problem_scores[submission.problem] = max(
+            current_score,
+            score,
+        )
+
+    total_score = sum(
+        problem_scores.values()
+    )
+
+    solved_count = len(
+        problem_scores
+    )
+
+    return {
+        "contest": contest,
+        "member": member,
+        "total_score": total_score,
+        "solved_count": solved_count,
+        "submission_count": len(submissions),
+    }
+@frappe.whitelist()
+def get_contest_score(
+    contest: str,
+) -> dict[str, Any]:
+    """Return the signed-in user's contest score."""
+
+    user = _require_login()
+
+    if not contest:
+        return {
+            "contest": None,
+            "member": user,
+            "total_score": 0,
+            "solved_count": 0,
+            "submission_count": 0,
+            "is_registered": False,
+        }
+
+    registration = frappe.db.exists(
+        "Contest Registration",
+        {
+            "contest": contest,
+            "user": user,
+            "status": "Joined",
+        },
+    )
+
+    if not registration:
+        return {
+            "contest": contest,
+            "member": user,
+            "total_score": 0,
+            "solved_count": 0,
+            "submission_count": 0,
+            "is_registered": False,
+        }
+
+    data = _get_contest_score_data(
+        contest=contest,
+        member=user,
+    )
+    data["is_registered"] = True
+    return data
+@frappe.whitelist()
+def get_contest_progress(
+    contest: str,
+) -> dict[str, Any]:
+    """Return the signed-in user's progress in a contest."""
+
+    user = _require_login()
+
+    if not contest or not frappe.db.exists("Contest", contest):
+        return {
+            "contest": contest,
+            "solved": [],
+            "attempted": [],
+            "unsolved": [],
+            "solved_count": 0,
+            "attempted_count": 0,
+            "unsolved_count": 0,
+            "total_problems": 0,
+            "total_score": 0,
+            "submission_count": 0,
+            "is_registered": False,
+        }
+
+    contest_doc = frappe.get_doc("Contest", contest)
+    problems_list = [cp.problem for cp in (contest_doc.problems or [])]
+    total_problems = len(problems_list)
+
+    registration = frappe.db.exists(
+        "Contest Registration",
+        {
+            "contest": contest,
+            "user": user,
+            "status": "Joined",
+        },
+    )
+
+    if not registration:
+        return {
+            "contest": contest,
+            "solved": [],
+            "attempted": [],
+            "unsolved": problems_list,
+            "solved_count": 0,
+            "attempted_count": 0,
+            "unsolved_count": total_problems,
+            "total_problems": total_problems,
+            "total_score": 0,
+            "submission_count": 0,
+            "is_registered": False,
+        }
+
+    submissions = frappe.get_all(
+        "Contest Submission",
+        filters={
+            "contest": contest,
+            "member": user,
+        },
+        fields=[
+            "name",
+            "problem",
+            "status",
+        ],
+        order_by="creation asc",
+    )
+
+    for submission in submissions:
+        if submission.status in {"Queued", "Running"}:
+            contest_submission = frappe.get_doc(
+                "Contest Submission",
+                submission.name,
+            )
+
+            result = _refresh_contest_submission(
+                contest_submission
+            )
+
+            submission.status = result["status"]
+
+    problem_status = {}
+
+    for submission in submissions:
+        problem = submission.problem
+
+        if submission.status == "Accepted":
+            problem_status[problem] = "Solved"
+
+        elif problem not in problem_status:
+            problem_status[problem] = "Attempted"
+
+    solved = []
+    attempted = []
+    unsolved = []
+
+    for problem in problems_list:
+        status = problem_status.get(
+            problem,
+            "Unsolved",
+        )
+
+        if status == "Solved":
+            solved.append(problem)
+
+        elif status == "Attempted":
+            attempted.append(problem)
+
+        else:
+            unsolved.append(problem)
+
+    score_data = _get_contest_score_data(
+        contest=contest,
+        member=user,
+    )
+
+    return {
+        "contest": contest,
+        "solved": solved,
+        "attempted": attempted,
+        "unsolved": unsolved,
+        "solved_count": len(solved),
+        "attempted_count": len(attempted),
+        "unsolved_count": len(unsolved),
+        "total_problems": total_problems,
+        "total_score": score_data["total_score"],
+        "submission_count": score_data["submission_count"],
+        "is_registered": True,
+    }
+@frappe.whitelist()
+def get_contest_submissions(
+    contest: str,
+    problem: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return the signed-in user's contest submissions."""
+
+    user = _require_login()
+
+    if not contest:
+        return []
+
+    registration = frappe.db.exists(
+        "Contest Registration",
+        {
+            "contest": contest,
+            "user": user,
+            "status": "Joined",
+        },
+    )
+
+    if not registration:
+        return []
+
+    filters = {
+        "contest": contest,
+        "member": user,
+    }
+
+    if problem:
+        filters["problem"] = problem
+
+    submissions = frappe.get_all(
+        "Contest Submission",
+        filters=filters,
+        fields=[
+            "name",
+            "contest",
+            "problem",
+            "status",
+            "score",
+            "language_id",
+            "dsa_submission",
+            "submission_time",
+            "creation",
+        ],
+        order_by="submission_time desc",
+        limit_page_length=100,
+    )
+
+    # Refresh unfinished submissions so that
+    # interrupted browser polling can recover.
+    for submission in submissions:
+        if submission.status in {"Queued", "Running"}:
+            contest_submission = frappe.get_doc(
+                "Contest Submission",
+                submission.name,
+            )
+
+            result = _refresh_contest_submission(
+                contest_submission
+            )
+
+            submission.status = result["status"]
+            submission.score = result["score"]
+            submission.passed_count = result["passed_count"]
+            submission.total_count = result["total_count"]
+
+    # Add passed/total counts from linked DSA submissions.
+    for submission in submissions:
+        if not hasattr(submission, "passed_count"):
+            submission.passed_count = 0
+
+        if not hasattr(submission, "total_count"):
+            submission.total_count = 0
+
+        if submission.dsa_submission:
+            dsa_data = frappe.db.get_value(
+                "DSA Submission",
+                submission.dsa_submission,
+                ["passed_count", "total_count"],
+                as_dict=True,
+            )
+
+            if dsa_data:
+                submission.passed_count = cint(
+                    dsa_data.passed_count or 0
+                )
+                submission.total_count = cint(
+                    dsa_data.total_count or 0
+                )
+
+    return submissions
+@frappe.whitelist(methods=["POST"])
+def submit_code(
+    problem: str,
+    code: str,
+    language_id: int = DEFAULT_LANGUAGE_ID,
+) -> dict[str, Any]:
+    user = _require_login()
+
+    problem_doc = frappe.get_doc(
+        "DSAProblem",
+        problem,
+    )
+
+    submission = _create_dsa_submission(
+        problem_doc=problem_doc,
+        user=user,
+        code=code,
+        language_id=language_id,
+    )
+
+    return {
+        "submission": submission.name,
+        "status": submission.status,
+    }
 
 
 def _normalized_output(value: str | None) -> str:
