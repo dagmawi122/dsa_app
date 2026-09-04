@@ -466,8 +466,27 @@ class ContestPage {
                     </div>
                 `}
             </section>
+
+            <!-- LEADERBOARD -->
+            <section class="details-section">
+                <div class="details-section-title">
+                    <span class="section-line"></span>
+                    <div>
+                        <h2>Leaderboard</h2>
+                        <p>See how participants are performing in this contest.</p>
+                    </div>
+                </div>
+
+                <div class="contest-leaderboard">
+                    <div class="leaderboard-loading">
+                        <div class="loading-spinner"></div>
+                        <span>Loading leaderboard...</span>
+                    </div>
+                </div>
+            </section>
         `);
 
+        this.load_leaderboard();
         this.bind_details_events(contest, isRegistered);
     }
 
@@ -539,6 +558,98 @@ class ContestPage {
             );
         });
     }
+
+    async load_leaderboard() {
+        try {
+            const res = await frappe.call({
+                method: "dsa.api.get_contest_leaderboard",
+                args: {
+                    contest: this.contest_name
+                }
+            });
+
+            const leaderboard = res.message?.leaderboard || [];
+
+            this.render_leaderboard(leaderboard);
+        } catch (error) {
+            console.error("Failed to load leaderboard:", error);
+
+            $(".contest-leaderboard").html(`
+                <div class="contest-state">
+                    <div class="state-icon error">!</div>
+                    <h3>Unable to load leaderboard</h3>
+                    <p>Something went wrong while loading the leaderboard.</p>
+                </div>
+            `);
+        }
+    }
+
+    render_leaderboard(leaderboard) {
+        if (!leaderboard.length) {
+            $(".contest-leaderboard").html(`
+                <div class="problems-placeholder">
+                    <div class="placeholder-icon">🏆</div>
+                    <h3>No participants yet</h3>
+                    <p>The leaderboard will appear once participants join the contest.</p>
+                </div>
+            `);
+            return;
+        }
+
+        $(".contest-leaderboard").html(`
+            <div class="leaderboard-table-wrapper">
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Participant</th>
+                            <th>Score</th>
+                            <th>Solved</th>
+                            <th>Submissions</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        ${leaderboard.map(row => `
+                            <tr>
+                                <td>
+                                    <span class="leaderboard-rank">
+                                        #${row.rank}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="leaderboard-user">
+                                        ${this.escape_html(row.full_name || row.member)}
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <strong class="leaderboard-score">
+                                        ${row.total_score}
+                                    </strong>
+                                </td>
+
+                                <td>
+                                    ${row.solved_count}
+                                </td>
+
+                                <td>
+                                    ${row.submission_count}
+                                </td>
+
+                                <td>
+                                    ${row.time ? this.format_date(row.time) : "—"}
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `);
+    }
+
 
     render_not_found() {
         $(".contest-details-page").html(`
@@ -739,6 +850,98 @@ class ContestPage {
 .contest-loading, .details-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 80px; color: #777; font-size: 13px; }
 @media (max-width: 900px) { .details-info-grid { grid-template-columns: repeat(2, 1fr); } .contest-grid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .details-info-grid { grid-template-columns: 1fr; } .contest-hero { padding: 25px; flex-direction: column; } .hero-decoration { display: none; } }
+.contest-leaderboard {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.leaderboard-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid rgba(255, 193, 7, 0.12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.leaderboard-table {
+    width: 100%;
+    min-width: 700px;
+    border-collapse: collapse;
+}
+
+.leaderboard-table th {
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    background: rgba(255, 255, 255, 0.025);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard-table td {
+    padding: 16px;
+    color: #ddd;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 14px;
+}
+
+.leaderboard-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.leaderboard-table tbody tr:hover {
+    background: rgba(255, 193, 7, 0.04);
+}
+
+.leaderboard-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: rgba(255, 193, 7, 0.08);
+    color: #ffc107;
+    font-weight: 700;
+}
+
+.leaderboard-user {
+    font-weight: 600;
+    color: #f1f1f1;
+}
+
+.leaderboard-score {
+    color: #ffc107;
+    font-size: 15px;
+}
+
+.leaderboard-loading {
+    min-height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #888;
+}
+
+.leaderboard-loading .loading-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 193, 7, 0.2);
+    border-top-color: #ffc107;
+    border-radius: 50%;
+    animation: leaderboard-spin 0.8s linear infinite;
+}
+
+@keyframes leaderboard-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 </style>
         `);
     }

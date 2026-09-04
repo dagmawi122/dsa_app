@@ -952,6 +952,151 @@ def get_contest_submissions(
                 )
 
     return submissions
+
+
+@frappe.whitelist()
+def get_contest_leaderboard(
+    contest: str,
+) -> dict[str, Any]:
+    """Return the leaderboard for a contest."""
+
+    user = _require_login()
+
+    if not contest or not frappe.db.exists("Contest", contest):
+        return {
+            "contest": contest,
+            "leaderboard": [],
+    }
+
+    participants = frappe.get_all(
+        "Contest Registration",
+        filters={
+            "contest": contest,
+            "status": "Joined",
+        },
+        fields=[
+            "user",
+            "joined_at",
+        ],
+    )
+
+    participant_users = [participant.user for participant in participants]
+
+    user_names = {}
+
+    if participant_users:
+        users = frappe.get_all(
+            "User",
+            filters={"name": ["in", participant_users]},
+            fields=["name", "full_name"],
+        )
+
+        user_names = {
+            user.name: user.full_name
+            for user in users
+        }
+
+    submissions = frappe.get_all(
+        "Contest Submission",
+        filters={
+            "contest": contest,
+        },
+        fields=[
+            "member",
+            "problem",
+            "status",
+            "score",
+            "submission_time",
+        ],
+        order_by="submission_time asc",
+    )
+
+    participant_data = {
+        participant.user: {
+            "member": participant.user,
+            "total_score": 0,
+            "solved_count": 0,
+            "submission_count": 0,
+            "last_accepted_at": None,
+            "problem_scores": {},
+        }
+        for participant in participants
+    }
+
+    for submission in submissions:
+        member = submission.member
+
+        if member not in participant_data:
+            continue
+
+        participant = participant_data[member]
+        participant["submission_count"] += 1
+
+        if submission.status != "Accepted":
+            continue
+
+        problem = submission.problem
+        score = cint(submission.score or 0)
+
+        current_score = participant["problem_scores"].get(problem, 0)
+
+        participant["problem_scores"][problem] = max(
+            current_score,
+            score,
+        )
+
+        participant["last_accepted_at"] = submission.submission_time
+
+    for participant in participant_data.values():
+        participant["total_score"] = sum(
+            participant["problem_scores"].values()
+        )
+        participant["solved_count"] = len(
+            participant["problem_scores"]
+        )
+
+    leaderboard = []
+
+    for participant in participant_data.values():
+        leaderboard.append({
+            "member": participant["member"],
+            "full_name": user_names.get(participant["member"]),
+            "total_score": participant["total_score"],
+            "solved_count": participant["solved_count"],
+            "submission_count": participant["submission_count"],
+            "time": participant["last_accepted_at"],
+        })
+
+    leaderboard.sort(
+        key=lambda row: (
+            -row["total_score"],
+            -row["solved_count"],
+            row["time"] is None,
+            row["time"] or "",
+        )
+    )
+
+    previous_key = None
+    current_rank = 0
+
+    for index, row in enumerate(leaderboard, start=1):
+        rank_key = (
+            row["total_score"],
+            row["solved_count"],
+            row["time"],
+        )
+
+        if rank_key != previous_key:
+            current_rank = index
+            previous_key = rank_key
+
+        row["rank"] = current_rank
+
+    return {
+        "contest": contest,
+        "leaderboard": leaderboard,
+    }
+
 @frappe.whitelist(methods=["POST"])
 def submit_code(
     problem: str,
