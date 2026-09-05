@@ -11,7 +11,5 @@ class DSAProblem(Document):
 			wrapper = self.get(wrapper_field) or ""
 			if wrapper.strip() and USER_CODE_MARKER not in wrapper:
 				frappe.throw(
-					_("{0} must contain {1}.").format(
-						self.meta.get_label(wrapper_field), USER_CODE_MARKER
-					)
+					_("{0} must contain {1}.").format(self.meta.get_label(wrapper_field), USER_CODE_MARKER)
 				)
