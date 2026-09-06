@@ -12,6 +12,21 @@ class IntegrationTestContest(IntegrationTestCase):
 	def setUp(self):
 		self.original_user = frappe.session.user
 		frappe.set_user("Administrator")
+		self.test_problem = frappe.get_doc(
+			{
+				"doctype": "DSAProblem",
+				"title": "Contest Test Problem",
+				"difficulty": "easy",
+				"description": "Test problem for contest tests",
+				"test_cases": [
+					{
+						"doctype": "TestCase",
+						"custom_input": "1",
+						"custom_expected_output": "1",
+					}
+				],
+			}
+		).insert()
 
 	def tearDown(self):
 		frappe.set_user(self.original_user)
@@ -55,6 +70,14 @@ class IntegrationTestContest(IntegrationTestCase):
 					"description": "Invalid date range",
 					"start_date": start,
 					"end_date": end,
+					"problems": [
+                        {
+                            "doctype": "Contest Problem",
+                            "problem": self.test_problem.name,
+                            "order": 1,
+                            "points": 100,
+                        }
+                    ],
 				}
 			)
 			with self.assertRaisesRegex(frappe.ValidationError, "End Date must be after Start Date"):
@@ -86,6 +109,14 @@ class IntegrationTestContest(IntegrationTestCase):
 				"start_date": now - timedelta(hours=1),
 				"end_date": now + timedelta(hours=1),
 				"status": "Completed",
+				"problems": [
+                    {
+                        "doctype": "Contest Problem",
+                        "problem": self.test_problem.name,
+                        "order": 1,
+                        "points": 100,
+                    }
+                ],
 			}
 		)
 		with patch("dsa.dsa.doctype.contest.contest.now_datetime", return_value=now):
@@ -137,5 +168,13 @@ class IntegrationTestContest(IntegrationTestCase):
 				"description": f"Description for {title}",
 				"start_date": start_date,
 				"end_date": end_date,
+				"problems": [
+					{
+						"doctype": "Contest Problem",
+						"problem": self.test_problem.name,
+						"order": 1,
+						"points": 100,
+					}
+				],
 			}
 		).insert()
