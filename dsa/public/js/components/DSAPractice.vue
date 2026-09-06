@@ -587,16 +587,40 @@ function formatSubmissionTime(submission) {
         "—";
 }
 
-function startTimer() {
-    if (!props.contestMode) return;
+function startTimer(startedAt) {
+    if (!props.contestMode || !startedAt) return;
 
     clearInterval(timerInterval);
 
-    elapsedTime.value = 0;
+    const startTime = new Date(startedAt).getTime();
 
-    timerInterval = setInterval(() => {
-        elapsedTime.value += 1;
-    }, 1000);
+    const updateElapsedTime = () => {
+        elapsedTime.value = Math.max(
+            0,
+            Math.floor((Date.now() - startTime) / 1000)
+        );
+    };
+
+    updateElapsedTime();
+
+    timerInterval = setInterval(updateElapsedTime, 1000);
+}
+
+async function startContestProblem() {
+    if (!props.contestMode || !props.contestName || !problem.value) {
+        return;
+    }
+
+    const attempt = await call(
+        "dsa.api.start_contest_problem",
+        {
+            contest: props.contestName,
+            problem: problem.value.name,
+        },
+        "POST"
+    );
+
+    startTimer(attempt.started_at);
 }
 
 function changeLanguage() {
@@ -864,7 +888,7 @@ onMounted(async () => {
 
             await loadProblem(props.problemName);
 
-            startTimer();
+            await startContestProblem();
 
             return;
         }
@@ -1074,14 +1098,23 @@ async function submitCode() {
             testResults.value = result.results || [];
 
             if (!result.pending) {
-                await loadSubmissions();
+            await loadSubmissions();
 
-                if (props.contestMode) {
-                    await loadContestProgress();
+            if (props.contestMode) {
+                const accepted =
+                    result.status === "Accepted" ||
+                    result.status_id === 3;
+
+                if (accepted) {
+                    submissionMade.value = true;
+                    clearInterval(timerInterval);
                 }
 
-                return;
+                await loadContestProgress();
             }
+
+            return;
+        }
 
             await wait(1000);
         }
@@ -1149,7 +1182,9 @@ async function setContestProblem(contest, newProblemName) {
     loading.value = true;
     try {
         await loadProblem(newProblemName);
+
         if (props.contestMode) {
+            await startContestProblem();
             await loadContestProgress();
         }
     } catch (error) {

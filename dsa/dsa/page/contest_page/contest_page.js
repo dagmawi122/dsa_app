@@ -585,70 +585,90 @@ class ContestPage {
     }
 
     render_leaderboard(leaderboard) {
-        if (!leaderboard.length) {
-            $(".contest-leaderboard").html(`
-                <div class="problems-placeholder">
-                    <div class="placeholder-icon">🏆</div>
-                    <h3>No participants yet</h3>
-                    <p>The leaderboard will appear once participants join the contest.</p>
-                </div>
-            `);
-            return;
-        }
-
+    if (!leaderboard.length) {
         $(".contest-leaderboard").html(`
-            <div class="leaderboard-table-wrapper">
-                <table class="leaderboard-table">
-                    <thead>
-                        <tr>
-                            <th>Rank</th>
-                            <th>Participant</th>
-                            <th>Score</th>
-                            <th>Solved</th>
-                            <th>Submissions</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        ${leaderboard.map(row => `
-                            <tr>
-                                <td>
-                                    <span class="leaderboard-rank">
-                                        #${row.rank}
-                                    </span>
-                                </td>
-
-                                <td>
-                                    <div class="leaderboard-user">
-                                        ${this.escape_html(row.full_name || row.member)}
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <strong class="leaderboard-score">
-                                        ${row.total_score}
-                                    </strong>
-                                </td>
-
-                                <td>
-                                    ${row.solved_count}
-                                </td>
-
-                                <td>
-                                    ${row.submission_count}
-                                </td>
-
-                                <td>
-                                    ${row.time ? this.format_date(row.time) : "—"}
-                                </td>
-                            </tr>
-                        `).join("")}
-                    </tbody>
-                </table>
+            <div class="problems-placeholder">
+                <div class="placeholder-icon">🏆</div>
+                <h3>No participants yet</h3>
+                <p>The leaderboard will appear once participants join the contest.</p>
             </div>
         `);
+        return;
     }
+
+    const format_solving_time = (seconds) => {
+        const total_seconds = Number(seconds || 0);
+
+        const hours = Math.floor(total_seconds / 3600);
+        const minutes = Math.floor((total_seconds % 3600) / 60);
+        const remaining_seconds = total_seconds % 60;
+
+        if (hours > 0) {
+            return `${hours}h ${minutes}m ${remaining_seconds}s`;
+        }
+
+        if (minutes > 0) {
+            return `${minutes}m ${remaining_seconds}s`;
+        }
+
+        return `${remaining_seconds}s`;
+    };
+
+    $(".contest-leaderboard").html(`
+        <div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Participant</th>
+                        <th>Score</th>
+                        <th>Solved</th>
+                        <th>Submissions</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    ${leaderboard.map(row => `
+                        <tr>
+                            <td>
+                                <span class="leaderboard-rank">
+                                    #${row.rank}
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="leaderboard-user">
+                                    ${this.escape_html(row.full_name || row.member)}
+                                </div>
+                            </td>
+
+                            <td>
+                                <strong class="leaderboard-score">
+                                    ${row.total_score}
+                                </strong>
+                            </td>
+
+                            <td>
+                                ${row.solved_count}
+                            </td>
+
+                            <td>
+                                ${row.submission_count}
+                            </td>
+
+                            <td>
+                                ${format_solving_time(
+                                    row.total_solving_time
+                                )}
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </div>
+    `);
+}
 
 
     render_not_found() {
@@ -747,8 +767,37 @@ class ContestPage {
 
         $("head").append(`
 <style id="contest-page-styles">
-.contest-page { padding: 30px; max-width: 1400px; margin: 0 auto; color: #eee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-.contest-hero { display: flex; justify-content: space-between; align-items: center; padding: 40px; border-radius: 14px; background: linear-gradient(135deg, #1f1f1f 0%, #151515 100%); border: 1px solid #2e2e2e; margin-bottom: 35px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }
+html body {
+    background: #0b0b0b !important;
+}
+
+.layout-main-section {
+    background: #0b0b0b !important;
+    border: none !important;
+}
+
+.layout-main-section-wrapper {
+    background: #0b0b0b !important;
+}
+
+.page-container {
+    background: #0b0b0b !important;
+}
+
+.contest-page {
+    min-height: 100vh;
+    background: #0b0b0b;
+}
+.contest-page {
+    min-height: 100vh;
+    padding: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+    background: #0b0b0b;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+    .contest-hero { display: flex; justify-content: space-between; align-items: center; padding: 40px; border-radius: 14px; background: linear-gradient(135deg, #1f1f1f 0%, #151515 100%); border: 1px solid #2e2e2e; margin-bottom: 35px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }
 .hero-badge { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 20px; background: rgba(255, 193, 7, 0.12); color: #ffc107; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 12px; }
 .hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #ffc107; animation: pulse-dot 1.8s infinite; }
 @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }

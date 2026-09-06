@@ -1,15 +1,18 @@
 {
  "actions": [],
  "autoname": "format:CONT-{#####}",
+ "creation": "2026-08-31 14:31:47.756407",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": ["title",
-            "description",
-             "problems",
-           "schedule_section",
-            "start_date",
-            "end_date",
-            "status"],
+ "field_order": [
+  "title",
+  "description",
+  "problems",
+  "schedule_section",
+  "start_date",
+  "end_date",
+  "status"
+ ],
  "fields": [
   {
    "fieldname": "title",
@@ -60,8 +63,12 @@
   }
  ],
  "links": [],
+ "modified": "2026-09-06 12:00:04.948562",
+ "modified_by": "Administrator",
  "module": "DSA",
  "name": "Contest",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
  "permissions": [
   {
    "create": 1,
@@ -76,6 +83,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "start_date",
  "sort_order": "DESC",
  "states": [],

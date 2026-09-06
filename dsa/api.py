@@ -207,6 +207,7 @@ def _contest_payload(contest, current_time=None, include_problems=False) -> dict
                 "title": frappe.db.get_value("DSAProblem", row.problem, "title") or row.problem,
                 "order": row.order,
                 "points": row.points,
+                "time_given": row.time_given,
             }
             for row in (contest.problems or [])
         ]
@@ -466,6 +467,7 @@ def _get_contest_problem(
             "problem",
             "points",
             "order",
+            "time_given",
         ],
         as_dict=True,
     )
@@ -475,12 +477,14 @@ def _get_contest_problem(
             _("This problem does not belong to the selected contest.")
         )
 
-    if cint(contest_problem.points) < 0:
+    if cint(contest_problem.time_given) < 0:
         frappe.throw(
-            _("Contest problem points cannot be negative.")
+            _("Contest problem time given cannot be negative.")
         )
 
     return contest_problem
+
+
 
 def _require_contest_participant(contest: str, user: str):
     """Make sure the user has joined the contest."""
@@ -554,6 +558,32 @@ def submit_contest_code(
         contest=contest,
         problem=problem,
     )
+
+    attempt = frappe.db.get_value(
+        "Contest Problem Attempt",
+        {
+            "contest": contest_doc.name,
+            "problem": problem,
+            "user": user,
+        },
+        ["name", "started_at"],
+        as_dict=True,
+    )
+
+    if not attempt:
+        attempt = frappe.get_doc(
+            {
+                "doctype": "Contest Problem Attempt",
+                "contest": contest_doc.name,
+                "problem": problem,
+                "user": user,
+                "started_at": frappe.utils.now_datetime(),
+            }
+        )
+
+        attempt.insert(
+            ignore_permissions=True
+        )
 
     # Anti-spam cooldown check (3 seconds)
     last_sub = frappe.db.get_value(
@@ -636,23 +666,60 @@ def _calculate_contest_submission_score(
     contest: str,
     problem: str,
     status: str,
+    submission_time,
+    member: str,
 ) -> int:
     """Calculate the score earned by a contest submission."""
-
     if status != "Accepted":
         return 0
 
-    points = frappe.db.get_value(
+    contest_problem = frappe.db.get_value(
         "Contest Problem",
         {
             "parent": contest,
             "parenttype": "Contest",
             "problem": problem,
         },
-        "points",
+        ["points", "time_given"],
+        as_dict=True,
     )
 
-    return cint(points or 0)
+    if not contest_problem:
+        return 0
+
+    points = cint(contest_problem.points or 0)
+    time_given = cint(contest_problem.time_given or 0)
+
+    attempt_started_at = frappe.db.get_value(
+        "Contest Problem Attempt",
+        {
+            "contest": contest,
+            "problem": problem,
+            "user": member,
+        },
+        "started_at",
+    )
+
+    if not attempt_started_at or not submission_time:
+        return points
+
+    if time_given <= 0:
+        return points
+
+    elapsed_seconds = frappe.utils.time_diff_in_seconds(
+        submission_time,
+        attempt_started_at,
+    )
+
+    allowed_seconds = time_given * 60
+    overtime_seconds = max(
+        0,
+        elapsed_seconds - allowed_seconds,
+    )
+
+    penalty = int(overtime_seconds // 600)
+
+    return max(points - penalty, 0)
 
 def _refresh_contest_submission(
     contest_submission,
@@ -692,6 +759,8 @@ def _refresh_contest_submission(
                 contest=contest_submission.contest,
                 problem=contest_submission.problem,
                 status=contest_submission.status,
+                submission_time=contest_submission.submission_time,
+                member=contest_submission.member,
             )
         )
 
@@ -758,6 +827,7 @@ def _get_contest_score_data(
             "member": member,
         },
         fields=[
+             "name",
             "problem",
             "status",
             "score",
@@ -1073,20 +1143,19 @@ def get_contest_submissions(
 
     return submissions
 
-
 @frappe.whitelist()
 def get_contest_leaderboard(
     contest: str,
 ) -> dict[str, Any]:
     """Return the leaderboard for a contest."""
 
-    user = _require_login()
+    _require_login()
 
     if not contest or not frappe.db.exists("Contest", contest):
         return {
             "contest": contest,
             "leaderboard": [],
-    }
+        }
 
     participants = frappe.get_all(
         "Contest Registration",
@@ -1100,15 +1169,23 @@ def get_contest_leaderboard(
         ],
     )
 
-    participant_users = [participant.user for participant in participants]
+    participant_users = [
+        participant.user
+        for participant in participants
+    ]
 
     user_names = {}
 
     if participant_users:
         users = frappe.get_all(
             "User",
-            filters={"name": ["in", participant_users]},
-            fields=["name", "full_name"],
+            filters={
+                "name": ["in", participant_users],
+            },
+            fields=[
+                "name",
+                "full_name",
+            ],
         )
 
         user_names = {
@@ -1122,6 +1199,7 @@ def get_contest_leaderboard(
             "contest": contest,
         },
         fields=[
+            "name",
             "member",
             "problem",
             "status",
@@ -1131,14 +1209,28 @@ def get_contest_leaderboard(
         order_by="submission_time asc",
     )
 
+    for submission in submissions:
+        if submission.status in {"Queued", "Running"}:
+            contest_submission = frappe.get_doc(
+                "Contest Submission",
+                submission.name,
+            )
+
+            result = _refresh_contest_submission(
+                contest_submission
+            )
+
+            submission.status = result["status"]
+            submission.score = result["score"]
+
     participant_data = {
         participant.user: {
             "member": participant.user,
             "total_score": 0,
             "solved_count": 0,
             "submission_count": 0,
-            "last_accepted_at": None,
             "problem_scores": {},
+            "problem_times": {},
         }
         for participant in participants
     }
@@ -1150,6 +1242,7 @@ def get_contest_leaderboard(
             continue
 
         participant = participant_data[member]
+
         participant["submission_count"] += 1
 
         if submission.status != "Accepted":
@@ -1158,21 +1251,62 @@ def get_contest_leaderboard(
         problem = submission.problem
         score = cint(submission.score or 0)
 
-        current_score = participant["problem_scores"].get(problem, 0)
+        current_score = participant["problem_scores"].get(
+            problem,
+            0,
+        )
 
         participant["problem_scores"][problem] = max(
             current_score,
             score,
         )
 
-        participant["last_accepted_at"] = submission.submission_time
+        attempt_started_at = frappe.db.get_value(
+            "Contest Problem Attempt",
+            {
+                "contest": contest,
+                "problem": problem,
+                "user": member,
+            },
+            "started_at",
+        )
+
+        if not attempt_started_at:
+            continue
+
+        elapsed_seconds = frappe.utils.time_diff_in_seconds(
+            submission.submission_time,
+            attempt_started_at,
+        )
+
+        elapsed_seconds = max(
+            elapsed_seconds,
+            0,
+        )
+
+        current_time = participant["problem_times"].get(
+            problem,
+        )
+
+        if current_time is None:
+            participant["problem_times"][problem] = elapsed_seconds
+        else:
+            participant["problem_times"][problem] = min(
+                current_time,
+                elapsed_seconds,
+            )
 
     for participant in participant_data.values():
         participant["total_score"] = sum(
             participant["problem_scores"].values()
         )
+
         participant["solved_count"] = len(
             participant["problem_scores"]
+        )
+
+        participant["total_solving_time"] = sum(
+            participant["problem_times"].values()
         )
 
     leaderboard = []
@@ -1180,30 +1314,36 @@ def get_contest_leaderboard(
     for participant in participant_data.values():
         leaderboard.append({
             "member": participant["member"],
-            "full_name": user_names.get(participant["member"]),
+            "full_name": user_names.get(
+                participant["member"]
+            ),
             "total_score": participant["total_score"],
             "solved_count": participant["solved_count"],
             "submission_count": participant["submission_count"],
-            "time": participant["last_accepted_at"],
+            "total_solving_time": participant[
+                "total_solving_time"
+            ],
         })
 
     leaderboard.sort(
         key=lambda row: (
             -row["total_score"],
             -row["solved_count"],
-            row["time"] is None,
-            row["time"] or "",
+            row["total_solving_time"],
         )
     )
 
     previous_key = None
     current_rank = 0
 
-    for index, row in enumerate(leaderboard, start=1):
+    for index, row in enumerate(
+        leaderboard,
+        start=1,
+    ):
         rank_key = (
             row["total_score"],
             row["solved_count"],
-            row["time"],
+            row["total_solving_time"],
         )
 
         if rank_key != previous_key:
@@ -1607,3 +1747,60 @@ def _compare_complexity(
         return "Optimal"
 
     return "Too Complex"
+
+@frappe.whitelist()
+def start_contest_problem(
+    contest: str,
+    problem: str,
+) -> dict[str, Any]:
+    """Get or create the start time for a user's contest problem."""
+
+    user = _require_login()
+
+    contest_doc = _require_active_contest(contest)
+
+    _require_contest_participant(
+        contest=contest,
+        user=user,
+    )
+
+    _get_contest_problem(
+        contest=contest,
+        problem=problem,
+    )
+
+    existing = frappe.db.get_value(
+        "Contest Problem Attempt",
+        {
+            "contest": contest_doc.name,
+            "problem": problem,
+            "user": user,
+        },
+        ["name", "started_at"],
+        as_dict=True,
+    )
+
+    if existing:
+        return {
+            "attempt": existing.name,
+            "started_at": existing.started_at,
+        }
+
+    started_at = now_datetime()
+
+    attempt = frappe.get_doc(
+        {
+            "doctype": "Contest Problem Attempt",
+            "contest": contest_doc.name,
+            "problem": problem,
+            "user": user,
+            "started_at": started_at,
+        }
+    )
+
+    attempt.insert(ignore_permissions=True)
+
+    return {
+        "attempt": attempt.name,
+        "started_at": attempt.started_at,
+    }
