@@ -960,7 +960,7 @@ def get_contest_leaderboard(
 ) -> dict[str, Any]:
     """Return the leaderboard for a contest."""
 
-    user = _require_login()
+    _require_login()
 
     if not contest or not frappe.db.exists("Contest", contest):
         return {
