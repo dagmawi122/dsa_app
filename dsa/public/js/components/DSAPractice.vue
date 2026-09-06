@@ -314,6 +314,28 @@
                                     <span v-if="resultRuntime">
                                         {{ __("Runtime") }}: {{ resultRuntime }}
                                     </span>
+
+                                    <span v-if="resultComplexity">
+                                        Time Complexity: {{ resultComplexity }}
+                                        <b
+                                            v-if="complexityResult"
+                                            :class="['complexity-result', complexityResult.toLowerCase().replace(' ', '-')]"
+                                        >
+                                            {{ complexityResult === "Optimal" ? "✓" : "⚠" }}
+                                            {{ complexityResult }}
+                                        </b>
+                                    </span>
+
+                                    <span v-if="resultSpaceComplexity">
+                                        Space Complexity: {{ resultSpaceComplexity }}
+                                        <b
+                                            v-if="spaceComplexityResult"
+                                            :class="['complexity-result', spaceComplexityResult.toLowerCase().replace(' ', '-')]"
+                                        >
+                                            {{ spaceComplexityResult === "Optimal" ? "✓" : "⚠" }}
+                                            {{ spaceComplexityResult }}
+                                        </b>
+                                    </span>
                                 </div>
 
                                 <div class="dsa-case-tabs result-cases">
@@ -460,6 +482,10 @@ const testResults = ref([]);
 const activeResultCaseIndex = ref(0);
 const overallStatus = ref("");
 const resultRuntime = ref("");
+const resultComplexity = ref("");
+const resultSpaceComplexity = ref("");
+const complexityResult = ref("");
+const spaceComplexityResult = ref("");
 const activeProblemTab = ref("description");
 const activeResultTab = ref("testcase");
 const submissions = ref([]);
@@ -600,6 +626,10 @@ function clearResults() {
     testResults.value = [];
     overallStatus.value = "";
     resultRuntime.value = "";
+    resultComplexity.value = "";
+    resultSpaceComplexity.value = "";
+    complexityResult.value = "";
+    spaceComplexityResult.value = "";
     activeResultCaseIndex.value = 0;
 }
 
@@ -720,6 +750,11 @@ async function call(method, args = {}, type = "GET") {
         args,
         type,
     });
+
+    if (method === "dsa.api.run_code") {
+        console.log("FULL FRAPPE RESPONSE:", response);
+        console.log("MESSAGE:", response.message);
+    }
 
     return response.message;
 }
@@ -887,6 +922,7 @@ async function runCode() {
             },
             "POST"
         );
+        console.log("RUN CODE RESPONSE:", queued);
 
         for (
             let attempt = 0;
@@ -902,12 +938,22 @@ async function runCode() {
             );
 
             if (!result.pending) {
-                overallStatus.value =
-                    result.status || __("Finished");
+                const complexityRejected =
+                    queued.complexity_result === "Too Complex" ||
+                    queued.space_complexity_result === "Too Complex";
+
+                overallStatus.value = complexityRejected
+                    ? "Rejected"
+                    : result.status || __("Finished");
 
                 resultRuntime.value = result.time
                     ? `${result.time} s`
                     : "";
+
+                resultComplexity.value = queued.complexity || "";
+                resultSpaceComplexity.value = queued.space_complexity || "";
+                complexityResult.value = queued.complexity_result || "";
+                spaceComplexityResult.value = queued.space_complexity_result || "";
 
                 testResults.value = [
                     {
@@ -953,27 +999,35 @@ async function submitCode() {
 
     try {
         const method = props.contestMode
-    ? "dsa.api.submit_contest_code"
-    : "dsa.api.submit_code";
+            ? "dsa.api.submit_contest_code"
+            : "dsa.api.submit_code";
 
-const args = props.contestMode
-    ? {
-          contest: frappe.get_route()[1],
-          problem: problem.value.name,
-          code: code.value,
-          language_id: selectedLanguageId.value,
-      }
-    : {
-          problem: problem.value.name,
-          code: code.value,
-          language_id: selectedLanguageId.value,
-      };
+        const args = props.contestMode
+            ? {
+                  contest: frappe.get_route()[1],
+                  problem: problem.value.name,
+                  code: code.value,
+                  language_id: selectedLanguageId.value,
+              }
+            : {
+                  problem: problem.value.name,
+                  code: code.value,
+                  language_id: selectedLanguageId.value,
+              };
 
-const queued = await call(
-    method,
-    args,
-    "POST"
-);
+        const queued = await call(
+            method,
+            args,
+            "POST"
+        );
+
+        resultComplexity.value = queued.complexity || "";
+        resultSpaceComplexity.value =
+            queued.space_complexity || "";
+        complexityResult.value =
+            queued.complexity_result || "";
+        spaceComplexityResult.value =
+            queued.space_complexity_result || "";
 
         for (
             let attempt = 0;
@@ -982,28 +1036,53 @@ const queued = await call(
             attempt += 1
         ) {
             const result = await call(
-    props.contestMode
-        ? "dsa.api.get_contest_submission_result"
-        : "dsa.api.get_submission_result",
-    {
-        submission: props.contestMode
-            ? queued.contest_submission
-            : queued.submission,
-    }
-);
+                props.contestMode
+                    ? "dsa.api.get_contest_submission_result"
+                    : "dsa.api.get_submission_result",
+                {
+                    submission: props.contestMode
+                        ? queued.contest_submission
+                        : queued.submission,
+                }
+            );
 
-            overallStatus.value = result.status;
-            testResults.value = result.results;
+            resultComplexity.value =
+                result.time_complexity ||
+                queued.complexity ||
+                "";
+
+            resultSpaceComplexity.value =
+                result.space_complexity ||
+                queued.space_complexity ||
+                "";
+
+            complexityResult.value =
+                result.complexity_result ||
+                queued.complexity_result ||
+                "";
+
+            spaceComplexityResult.value =
+                result.space_complexity_result ||
+                queued.space_complexity_result ||
+                "";
+
+            overallStatus.value =
+                result.display_status ||
+                result.status ||
+                __("Finished");
+
+            testResults.value = result.results || [];
 
             if (!result.pending) {
-    await loadSubmissions();
+                await loadSubmissions();
 
-    if (props.contestMode) {
-        await loadContestProgress();
-    }
+                if (props.contestMode) {
+                    await loadContestProgress();
+                }
 
-    return;
-}
+                return;
+            }
+
             await wait(1000);
         }
 
@@ -1016,6 +1095,7 @@ const queued = await call(
         busy.value = false;
     }
 }
+
 async function loadContestProgress() {
     if (!props.contestMode) return;
 
@@ -1245,9 +1325,35 @@ onBeforeUnmount(() => {
 }
 
 .dsa-rich-text {
-    color: #dedede;
+    color: #ffffff;
     font-size: 13px;
     line-height: 1.65;
+}
+
+.dsa-rich-text :deep(p),
+.dsa-rich-text :deep(span),
+.dsa-rich-text :deep(div),
+.dsa-rich-text :deep(li),
+.dsa-rich-text :deep(ul),
+.dsa-rich-text :deep(ol),
+.dsa-rich-text :deep(strong),
+.dsa-rich-text :deep(em),
+.dsa-rich-text :deep(b),
+.dsa-rich-text :deep(i) {
+    color: #ffffff;
+}
+
+.dsa-rich-text :deep(a) {
+    color: #6ea8fe;
+}
+
+.dsa-rich-text :deep(h1),
+.dsa-rich-text :deep(h2),
+.dsa-rich-text :deep(h3),
+.dsa-rich-text :deep(h4),
+.dsa-rich-text :deep(h5),
+.dsa-rich-text :deep(h6) {
+    color: #ffffff;
 }
 
 .dsa-rich-text :deep(pre) {
@@ -1963,5 +2069,21 @@ onBeforeUnmount(() => {
 body.dsa-resizing {
     cursor: col-resize !important;
     user-select: none !important;
+}
+.complexity-result {
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+.complexity-result.optimal {
+    color: #28c76f;
+}
+
+.complexity-result.too-complex {
+    color: #e05757;
+}
+
+.complexity-result.unknown {
+    color: #999;
 }
 </style>

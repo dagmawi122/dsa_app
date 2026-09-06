@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import code
+import re
 from typing import Any
 
 import frappe
@@ -14,6 +16,16 @@ from dsa.dsa.doctype.contest.contest import get_contest_status
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
 PENDING_STATUS_IDS = {1, 2}
+COMPLEXITY_RANK = {
+    "O(1)": 0,
+    "O(log n)": 1,
+    "O(n)": 2,
+    "O(n log n)": 3,
+    "O(n²)": 4,
+    "O(n³)": 5,
+    "O(2^n)": 6,
+    "O(n!)": 7,
+}
 
 def _map_judge0_status(status_id: int | None, output_matches: bool) -> str:
     if status_id in PENDING_STATUS_IDS:
@@ -133,24 +145,27 @@ def _official_expected_output(
 
 
 def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any]:
-	starter_codes = {
-		str(language_id): problem.get(starter_field) or ""
-		for language_id, (starter_field, _wrapper_field) in LANGUAGE_CODE_FIELDS.items()
-	}
-	return {
-		"name": problem.name,
-		"title": problem.title,
-		"description": problem.description,
-		"difficulty": problem.difficulty,
-		"examples": problem.examples,
-		"constraints": problem.constraints,
-		"starter_code": starter_codes[str(DEFAULT_LANGUAGE_ID)],
-		"starter_codes": starter_codes,
-		"test_cases": [
-			{"index": index, "input": row.custom_input or ""}
-			for index, row in enumerate(problem.test_cases, start=1)
-		],
-	}
+    starter_codes = {
+        str(language_id): problem.get(starter_field) or ""
+        for language_id, (starter_field, _wrapper_field) in LANGUAGE_CODE_FIELDS.items()
+    }
+
+    return {
+        "name": problem.name,
+        "title": problem.title,
+        "description": problem.description,
+        "difficulty": problem.difficulty,
+        "examples": problem.examples,
+        "constraints": problem.constraints,
+        "time_complexity": problem.time_complexity,
+        "space_complexity": problem.space_complexity,
+        "starter_code": starter_codes[str(DEFAULT_LANGUAGE_ID)],
+        "starter_codes": starter_codes,
+        "test_cases": [
+            {"index": index, "input": row.custom_input or ""}
+            for index, row in enumerate(problem.test_cases, start=1)
+        ],
+    }
 
 
 @frappe.whitelist()
@@ -189,6 +204,7 @@ def _contest_payload(contest, current_time=None, include_problems=False) -> dict
         payload["problems"] = [
             {
                 "problem": row.problem,
+                "title": frappe.db.get_value("DSAProblem", row.problem, "title") or row.problem,
                 "order": row.order,
                 "points": row.points,
             }
@@ -268,27 +284,68 @@ def get_submissions(problem: str) -> list[dict[str, Any]]:
 	)
 
 
+
 @frappe.whitelist(methods=["POST"])
 def run_code(
-	problem: str,
-	code: str,
-	stdin: str = "",
-	language_id: int = DEFAULT_LANGUAGE_ID,
-	test_case_index: int | None = None,
+    problem: str,
+    code: str,
+    stdin: str = "",
+    language_id: int = DEFAULT_LANGUAGE_ID,
+    test_case_index: int | None = None,
 ) -> dict[str, Any]:
-	_require_login()
-	if not code or not code.strip():
-		frappe.throw(_("Enter some code before running it."))
-	language_id = cint(language_id)
-	problem_doc = frappe.get_doc("DSAProblem", problem)
-	source_code = _build_source_code(problem_doc, code, language_id)
-	expected_output = _official_expected_output(problem_doc, stdin or "", test_case_index)
-	return {
-		"token": _create_judge0_submission(
-			source_code, stdin or "", language_id, expected_output=expected_output
-		)
-	}
+    _require_login()
 
+    if not code or not code.strip():
+        frappe.throw(_("Enter some code before running it."))
+
+    language_id = cint(language_id)
+    problem_doc = frappe.get_doc("DSAProblem", problem)
+
+    
+
+    source_code = _build_source_code(problem_doc, code, language_id)
+
+    expected_output = _official_expected_output(
+        problem_doc,
+        stdin or "",
+        test_case_index,
+    )
+
+    time_complexity = _estimate_time_complexity(code)
+    space_complexity = _estimate_space_complexity(code)
+
+    time_complexity_result = _compare_complexity(
+        time_complexity,
+        problem_doc.time_complexity,
+    )
+
+    space_complexity_result = _compare_complexity(
+        space_complexity,
+        problem_doc.space_complexity,
+    )
+
+    
+
+    execution_token = _create_judge0_submission(
+        source_code,
+        stdin or "",
+        language_id,
+        expected_output=expected_output,
+    )
+
+    if time_complexity_result == "Too Complex" or space_complexity_result == "Too Complex":
+        complexity_status = "Rejected"
+    else:
+        complexity_status = "Accepted"
+
+    return {
+        "token": execution_token,
+        "complexity": time_complexity,
+        "space_complexity": space_complexity,
+        "complexity_result": time_complexity_result,
+        "space_complexity_result": space_complexity_result,
+        "complexity_status": complexity_status,
+    }
 
 @frappe.whitelist()
 def get_run_result(token: str) -> dict[str, Any]:
@@ -331,6 +388,19 @@ def _create_dsa_submission(
 
     language_id = cint(language_id)
 
+    time_complexity = _estimate_time_complexity(code)
+    space_complexity = _estimate_space_complexity(code)
+
+    time_complexity_result = _compare_complexity(
+        time_complexity,
+        problem_doc.time_complexity,
+    )
+
+    space_complexity_result = _compare_complexity(
+        space_complexity,
+        problem_doc.space_complexity,
+    )
+
     source_code = _build_source_code(
         problem_doc,
         code,
@@ -344,6 +414,11 @@ def _create_dsa_submission(
     submission.code = code
     submission.language_id = language_id
     submission.status = "Queued"
+
+    submission.time_complexity = time_complexity
+    submission.space_complexity = space_complexity
+    submission.complexity_result = time_complexity_result
+    submission.space_complexity_result = space_complexity_result
 
     for index, test_case in enumerate(
         problem_doc.test_cases,
@@ -372,6 +447,7 @@ def _create_dsa_submission(
     )
 
     return submission
+
 def _get_contest_problem(
     contest: str,
     problem: str,
@@ -496,6 +572,26 @@ def submit_contest_code(
         problem,
     )
 
+    time_complexity = _estimate_time_complexity(code)
+    space_complexity = _estimate_space_complexity(code)
+
+    time_complexity_result = _compare_complexity(
+        time_complexity,
+        problem_doc.time_complexity,
+    )
+
+    space_complexity_result = _compare_complexity(
+        space_complexity,
+        problem_doc.space_complexity,
+    )
+
+    complexity_status = (
+        "Rejected"
+        if time_complexity_result == "Too Complex"
+        or space_complexity_result == "Too Complex"
+        else "Accepted"
+    )
+
     # 5. Create the normal DSA submission.
     dsa_submission = _create_dsa_submission(
         problem_doc=problem_doc,
@@ -529,7 +625,13 @@ def submit_contest_code(
         "status": contest_submission.status,
         "score": contest_submission.score,
         "points": contest_problem.points,
+        "complexity": time_complexity,
+        "space_complexity": space_complexity,
+        "complexity_result": time_complexity_result,
+        "space_complexity_result": space_complexity_result,
+        "complexity_status": complexity_status,
     }
+
 def _calculate_contest_submission_score(
     contest: str,
     problem: str,
@@ -571,12 +673,20 @@ def _refresh_contest_submission(
         dsa_submission
     )
 
-    # Keep contest submission Running while Judge0 is still processing.
+    complexity_rejected = (
+        result["complexity_result"] == "Too Complex"
+        or result["space_complexity_result"] == "Too Complex"
+    )
+
     if result["pending"]:
         contest_submission.status = "Running"
         contest_submission.score = 0
+    elif complexity_rejected:
+        contest_submission.status = "Failed"
+        contest_submission.score = 0
     else:
         contest_submission.status = result["status"]
+
         contest_submission.score = (
             _calculate_contest_submission_score(
                 contest=contest_submission.contest,
@@ -595,11 +705,21 @@ def _refresh_contest_submission(
         "problem": contest_submission.problem,
         "pending": result["pending"],
         "status": contest_submission.status,
+        "display_status": (
+            "Rejected"
+            if complexity_rejected
+            else contest_submission.status
+        ),
         "score": contest_submission.score,
         "passed_count": result["passed_count"],
         "total_count": result["total_count"],
         "results": result["results"],
+        "time_complexity": result["time_complexity"],
+        "space_complexity": result["space_complexity"],
+        "complexity_result": result["complexity_result"],
+        "space_complexity_result": result["space_complexity_result"],
     }
+
 @frappe.whitelist()
 def get_contest_submission_result(
     submission: str,
@@ -1110,6 +1230,26 @@ def submit_code(
         problem,
     )
 
+    time_complexity = _estimate_time_complexity(code)
+    space_complexity = _estimate_space_complexity(code)
+
+    time_complexity_result = _compare_complexity(
+        time_complexity,
+        problem_doc.time_complexity,
+    )
+
+    space_complexity_result = _compare_complexity(
+        space_complexity,
+        problem_doc.space_complexity,
+    )
+
+    complexity_status = (
+        "Rejected"
+        if time_complexity_result == "Too Complex"
+        or space_complexity_result == "Too Complex"
+        else "Accepted"
+    )
+
     submission = _create_dsa_submission(
         problem_doc=problem_doc,
         user=user,
@@ -1120,6 +1260,11 @@ def submit_code(
     return {
         "submission": submission.name,
         "status": submission.status,
+        "complexity": time_complexity,
+        "space_complexity": space_complexity,
+        "complexity_result": time_complexity_result,
+        "space_complexity_result": space_complexity_result,
+        "complexity_status": complexity_status,
     }
 
 
@@ -1128,69 +1273,106 @@ def _normalized_output(value: str | None) -> str:
 
 
 def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]:
-	pending = False
-	passed = 0
-	public_results = []
-	for row in doc.results:
-		if row.status in {"Accepted", "Failed"}:
-			passed += row.status == "Accepted"
-			public_results.append(
-				{
-					"index": row.test_case_index,
-					"status": row.status,
-					"input": row.input,
-					"expected_output": row.expected_output,
-					"actual_output": row.actual_output,
-					"error": row.error_output or None,
-				}
-			)
-			continue
+    pending = False
+    passed = 0
+    public_results = []
 
-		result = _get_judge0_submission(row.token)
-		judge_status = result.get("status") or {}
-		if judge_status.get("id") in PENDING_STATUS_IDS:
-			pending = True
-			public_results.append(
-				{"index": row.test_case_index, "status": "Running", "input": row.input}
-			)
-			continue
+    for row in doc.results:
+        if row.status in {"Accepted", "Failed"}:
+            passed += row.status == "Accepted"
 
-		row.actual_output = result.get("stdout") or ""
-		row.error_output = result.get("compile_output") or result.get("stderr") or result.get("message") or ""
-		row.status = (
-			"Accepted"
-			if judge_status.get("id") == 3
-			and _normalized_output(row.actual_output) == _normalized_output(row.expected_output)
-			else "Failed"
-		)
-		passed += row.status == "Accepted"
-		public_results.append(
-			{
-				"index": row.test_case_index,
-				"status": row.status,
-				"judge_status": judge_status.get("description"),
-				"input": row.input,
-				"expected_output": row.expected_output,
-				"actual_output": row.actual_output,
-				"error": row.error_output if row.status == "Failed" else None,
-			}
-		)
+            public_results.append(
+                {
+                    "index": row.test_case_index,
+                    "status": row.status,
+                    "input": row.input,
+                    "expected_output": row.expected_output,
+                    "actual_output": row.actual_output,
+                    "error": row.error_output or None,
+                }
+            )
 
-	doc.passed_count = passed
-	if pending:
-		doc.status = "Running"
-	else:
-		doc.status = "Accepted" if passed == doc.total_count else "Failed"
-	doc.save(ignore_permissions=True)
+            continue
 
-	return {
-		"pending": pending,
-		"status": doc.status,
-		"passed_count": doc.passed_count,
-		"total_count": doc.total_count,
-		"results": public_results,
-	}
+        result = _get_judge0_submission(row.token)
+        judge_status = result.get("status") or {}
 
+        if judge_status.get("id") in PENDING_STATUS_IDS:
+            pending = True
+
+            public_results.append(
+                {
+                    "index": row.test_case_index,
+                    "status": "Running",
+                    "input": row.input,
+                }
+            )
+
+            continue
+
+        row.actual_output = result.get("stdout") or ""
+
+        row.error_output = (
+            result.get("compile_output")
+            or result.get("stderr")
+            or result.get("message")
+            or ""
+        )
+
+        row.status = (
+            "Accepted"
+            if judge_status.get("id") == 3
+            and _normalized_output(row.actual_output)
+            == _normalized_output(row.expected_output)
+            else "Failed"
+        )
+
+        passed += row.status == "Accepted"
+
+        public_results.append(
+            {
+                "index": row.test_case_index,
+                "status": row.status,
+                "judge_status": judge_status.get("description"),
+                "input": row.input,
+                "expected_output": row.expected_output,
+                "actual_output": row.actual_output,
+                "error": row.error_output if row.status == "Failed" else None,
+            }
+        )
+
+    doc.passed_count = passed
+
+    complexity_rejected = (
+        doc.complexity_result == "Too Complex"
+        or doc.space_complexity_result == "Too Complex"
+    )
+
+    if pending:
+        doc.status = "Running"
+    elif complexity_rejected:
+        doc.status = "Failed"
+    else:
+        doc.status = (
+            "Accepted"
+            if passed == doc.total_count
+            else "Failed"
+        )
+
+    doc.save(ignore_permissions=True)
+
+    return {
+        "pending": pending,
+        "status": doc.status,
+        "display_status": "Rejected" if complexity_rejected else doc.status,
+        "passed_count": doc.passed_count,
+        "total_count": doc.total_count,
+        "results": public_results,
+        "time_complexity": doc.time_complexity,
+        "space_complexity": doc.space_complexity,
+        "complexity_result": doc.complexity_result,
+        "space_complexity_result": doc.space_complexity_result,
+    }
 
 @frappe.whitelist()
 def get_submission_result(submission: str) -> dict[str, Any]:
@@ -1199,3 +1381,229 @@ def get_submission_result(submission: str) -> dict[str, Any]:
 	if doc.member != user and "System Manager" not in frappe.get_roles(user):
 		frappe.throw(_("You cannot view this submission."), frappe.PermissionError)
 	return _refresh_submission(doc)
+
+def _estimate_time_complexity(code: str) -> str:
+    code = re.sub(r"//.*", "", code)
+    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+
+    if re.search(
+        r"\b(for|while)\s*\([^)]*\b(i|j|k|n|size|len|length)\b[^)]*"
+        r"(?:\*=|/=)\s*\d+",
+        code,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b\w+\s*(?:/=|\*=)\s*\d+\s*;",
+        code,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b(for|while)\s*\([^)]*\b(low|high|left|right|lo|hi)\b"
+        r"[^)]*\b(mid|middle)\b",
+        code,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b(low|high|left|right|lo|hi)\b.*[<>]=?.*\b(mid|middle)\b"
+        r"|\b(mid|middle)\b.*[<>]=?.*\b(low|high|left|right|lo|hi)\b",
+        code,
+        re.DOTALL,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b(sort|stable_sort)\s*\(",
+        code,
+    ):
+        return "O(n log n)"
+
+    function_pattern = re.compile(
+        r"\b(?:int|void|bool|string|long|double|float|char)\s+"
+        r"(\w+)\s*\([^)]*\)\s*\{"
+    )
+
+    for match in function_pattern.finditer(code):
+        function_name = match.group(1)
+
+        brace_pos = match.end() - 1
+        depth = 1
+        i = brace_pos + 1
+
+        while i < len(code) and depth:
+            if code[i] == "{":
+                depth += 1
+            elif code[i] == "}":
+                depth -= 1
+            i += 1
+
+        function_body = code[match.end():i - 1]
+
+        recursive_calls = re.findall(
+            rf"\b{re.escape(function_name)}\s*\(",
+            function_body,
+        )
+
+        if recursive_calls:
+            recursive_call_pattern = re.compile(
+                rf"\b{re.escape(function_name)}\s*\("
+            )
+
+            for loop_match in re.finditer(
+                r"\bfor\s*\([^)]*\)",
+                function_body,
+            ):
+                loop_start = loop_match.end()
+                brace_pos = function_body.find("{", loop_start)
+
+                if brace_pos == -1:
+                    continue
+
+                depth = 1
+                j = brace_pos + 1
+
+                while j < len(function_body) and depth:
+                    if function_body[j] == "{":
+                        depth += 1
+                    elif function_body[j] == "}":
+                        depth -= 1
+                    j += 1
+
+                loop_body = function_body[brace_pos:j]
+
+                if recursive_call_pattern.search(loop_body):
+                    return "O(n!)"
+
+            if len(recursive_calls) >= 2:
+                return "O(2^n)"
+
+            return "O(n)"
+
+    loop_pattern = re.compile(r"\b(for|while)\s*\(")
+    loops = []
+
+    for match in loop_pattern.finditer(code):
+        start = match.end()
+        brace_pos = code.find("{", start)
+
+        if brace_pos == -1:
+            continue
+
+        header = code[match.start():brace_pos]
+
+        constant_loop = bool(
+            re.search(
+                r"(?:<|<=)\s*\d+\b",
+                header,
+            )
+        )
+
+        depth = 1
+        i = brace_pos + 1
+
+        while i < len(code) and depth:
+            if code[i] == "{":
+                depth += 1
+            elif code[i] == "}":
+                depth -= 1
+            i += 1
+
+        loops.append(
+            {
+                "start": match.start(),
+                "body_start": brace_pos,
+                "end": i,
+                "constant": constant_loop,
+            }
+        )
+
+    variable_loops = [
+        loop for loop in loops
+        if not loop["constant"]
+    ]
+
+    max_loop_depth = 0
+
+    for loop in variable_loops:
+        depth = 1
+
+        for other in variable_loops:
+            if (
+                other["body_start"] > loop["body_start"]
+                and other["end"] < loop["end"]
+            ):
+                depth += 1
+
+        max_loop_depth = max(max_loop_depth, depth)
+
+    if max_loop_depth >= 3:
+        return "O(n³)"
+
+    if max_loop_depth == 2:
+        return "O(n²)"
+
+    if max_loop_depth == 1:
+        return "O(n)"
+
+    return "O(1)"
+
+def _estimate_space_complexity(code: str) -> str:
+    code = re.sub(r"//.*", "", code)
+    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+
+    if re.search(
+        r"\b(vector|deque|list|set|unordered_set|map|unordered_map)\s*"
+        r"<[^;]+>\s+\w+\s*(?:\([^;]*\))?\s*;",
+        code,
+    ):
+        return "O(n)"
+
+    if re.search(
+        r"\b(vector|deque|list|set|unordered_set|map|unordered_map)\s*"
+        r"<[^;]+>\s+\w+\s*;",
+        code,
+    ):
+        return "O(n)"
+
+    if re.search(
+        r"\b(new|malloc|calloc|realloc)\s*\(",
+        code,
+    ):
+        return "O(n)"
+
+    function_match = re.search(
+        r"\b(?:int|void|bool|string|long|double|float|char)\s+"
+        r"(\w+)\s*\([^)]*\)\s*\{",
+        code,
+    )
+
+    if function_match:
+        function_name = function_match.group(1)
+
+        if re.search(
+            rf"\b{re.escape(function_name)}\s*\(",
+            code[function_match.end():],
+        ):
+            return "O(n)"
+
+    return "O(1)"
+
+def _compare_complexity(
+    actual: str,
+    expected: str,
+) -> str:
+    if not expected:
+        return "Unknown"
+
+    actual_rank = COMPLEXITY_RANK.get(actual)
+    expected_rank = COMPLEXITY_RANK.get(expected)
+
+    if actual_rank is None or expected_rank is None:
+        return "Unknown"
+
+    if actual_rank <= expected_rank:
+        return "Optimal"
+
+    return "Too Complex"

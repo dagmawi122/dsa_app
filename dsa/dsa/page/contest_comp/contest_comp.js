@@ -134,9 +134,9 @@ class ContestComp {
                                 ${this.escape_html(contest.title || contest.name)}
                             </h1>
 
-                            <p class="contest-comp-description">
-                                ${this.escape_html(contest.description || "Test your problem-solving skills.")}
-                            </p>
+                            <div class="contest-comp-description">
+                                ${contest.description || "Test your problem-solving skills."}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -238,7 +238,7 @@ class ContestComp {
                 <div class="problem-main">
                     <div class="problem-title-row">
                         <div class="problem-title">
-                            ${this.escape_html(problem.problem)}
+                            ${this.escape_html(problem.title || problem.problem)}
                         </div>
                         ${statusPill}
                     </div>
@@ -360,6 +360,27 @@ class ContestComp {
                 .empty-icon { font-size: 26px; color: #555; margin-bottom: 10px; }
                 .contest-comp-loading, .contest-error { min-height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #777; }
                 .loading-spinner { width: 26px; height: 26px; border: 2px solid #333; border-top-color: #ffc107; border-radius: 50%; animation: spin 0.8s linear infinite; }
+                .contest-comp-description {
+                    color: #888;
+                    font-size: 14px;
+                    margin: 0;
+                    line-height: 1.6;
+                }
+
+                .contest-comp-description .ql-editor {
+                    padding: 0;
+                    color: #888;
+                    font-size: 14px;
+                    line-height: 1.6;
+                }
+
+                .contest-comp-description .ql-editor p {
+                    margin: 0 0 10px;
+                }
+
+                .contest-comp-description .ql-editor p:last-child {
+                    margin-bottom: 0;
+                }
                 @keyframes spin { to { transform: rotate(360deg); } }
                 @media (max-width: 900px) { .contest-info-grid { grid-template-columns: repeat(2, 1fr); } }
                 @media (max-width: 600px) { .contest-info-grid { grid-template-columns: 1fr; } .contest-problem-card { padding: 14px; } }

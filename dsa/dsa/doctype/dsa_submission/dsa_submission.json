@@ -1,93 +1,122 @@
 {
-  "actions": [],
-  "doctype": "DocType",
-  "engine": "InnoDB",
-  "field_order": [
-    "problem",
-    "member",
-    "status",
-    "language_id",
-    "code",
-    "passed_count",
-    "total_count",
-    "results"
-  ],
-  "fields": [
-    {
-      "fieldname": "problem",
-      "fieldtype": "Link",
-      "in_list_view": 1,
-      "label": "Problem",
-      "options": "DSAProblem",
-      "reqd": 1
-    },
-    {
-      "fieldname": "member",
-      "fieldtype": "Link",
-      "in_list_view": 1,
-      "label": "Member",
-      "options": "User",
-      "reqd": 1
-    },
-    {
-      "fieldname": "status",
-      "fieldtype": "Select",
-      "in_list_view": 1,
-      "label": "Status",
-      "options": "Queued\nRunning\nAccepted\nWrong Answer\nTime Limit Exceeded\nCompilation Error\nRuntime Error\nFailed",
-      "read_only": 1
-    },
-    {
-      "default": "54",
-      "fieldname": "language_id",
-      "fieldtype": "Int",
-      "label": "Judge0 Language ID",
-      "read_only": 1
-    },
-    {
-      "fieldname": "code",
-      "fieldtype": "Code",
-      "label": "Code",
-      "options": "C++",
-      "read_only": 1
-    },
-    {
-      "default": "0",
-      "fieldname": "passed_count",
-      "fieldtype": "Int",
-      "label": "Passed",
-      "read_only": 1
-    },
-    {
-      "default": "0",
-      "fieldname": "total_count",
-      "fieldtype": "Int",
-      "label": "Total",
-      "read_only": 1
-    },
-    {
-      "fieldname": "results",
-      "fieldtype": "Table",
-      "label": "Results",
-      "options": "DSA Submission Result",
-      "read_only": 1
-    }
-  ],
-  "links": [],
-  "module": "DSA",
-  "name": "DSA Submission",
-  "permissions": [
-    {
-      "email": 1,
-      "export": 1,
-      "print": 1,
-      "read": 1,
-      "report": 1,
-      "role": "System Manager"
-    }
-  ],
-  "sort_field": "creation",
-  "sort_order": "DESC",
-  "states": [],
-  "track_changes": 1
+ "actions": [],
+ "creation": "2026-09-04 09:32:14.225337",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "problem",
+  "member",
+  "status",
+  "language_id",
+  "code",
+  "passed_count",
+  "total_count",
+  "results",
+  "time_complexity",
+  "space_complexity",
+  "complexity_result",
+  "space_complexity_result"
+ ],
+ "fields": [
+  {
+   "fieldname": "problem",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Problem",
+   "options": "DSAProblem",
+   "reqd": 1
+  },
+  {
+   "fieldname": "member",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Member",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Queued\nRunning\nAccepted\nWrong Answer\nTime Limit Exceeded\nCompilation Error\nRuntime Error\nFailed",
+   "read_only": 1
+  },
+  {
+   "default": "54",
+   "fieldname": "language_id",
+   "fieldtype": "Int",
+   "label": "Judge0 Language ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "code",
+   "fieldtype": "Code",
+   "label": "Code",
+   "options": "C++",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "passed_count",
+   "fieldtype": "Int",
+   "label": "Passed",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "total_count",
+   "fieldtype": "Int",
+   "label": "Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "results",
+   "fieldtype": "Table",
+   "label": "Results",
+   "options": "DSA Submission Result",
+   "read_only": 1
+  },
+  {
+   "fieldname": "time_complexity",
+   "fieldtype": "Data",
+   "label": "Time Complexity"
+  },
+  {
+   "fieldname": "space_complexity",
+   "fieldtype": "Data",
+   "label": "Space Complexity"
+  },
+  {
+   "fieldname": "complexity_result",
+   "fieldtype": "Data",
+   "label": "Complexity Result"
+  },
+  {
+   "fieldname": "space_complexity_result",
+   "fieldtype": "Data",
+   "label": "Space Complexity Result"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-04 15:10:46.757424",
+ "modified_by": "Administrator",
+ "module": "DSA",
+ "name": "DSA Submission",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
 }
