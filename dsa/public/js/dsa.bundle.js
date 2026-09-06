@@ -64,7 +64,10 @@ class ContestProblemPage {
 		const currentContest = route[1];
 		const currentProblem = route[2];
 
-		if (currentProblem && (currentProblem !== this.problemName || currentContest !== this.contestName)) {
+		if (
+			currentProblem &&
+			(currentProblem !== this.problemName || currentContest !== this.contestName)
+		) {
 			this.contestName = currentContest;
 			this.problemName = currentProblem;
 			this.component?.setContestProblem?.(currentContest, currentProblem);

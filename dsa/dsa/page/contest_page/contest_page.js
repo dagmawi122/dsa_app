@@ -1,59 +1,57 @@
 frappe.pages["contest-page"].on_page_load = function (wrapper) {
-    new ContestPage(wrapper);
+	new ContestPage(wrapper);
 };
 
 frappe.pages["contest-page"].on_page_show = function (wrapper) {
-    const route = frappe.get_route();
-    const contest_name = route[1];
+	const route = frappe.get_route();
+	const contest_name = route[1];
 
-    if (wrapper.contest_page_instance) {
-        wrapper.contest_page_instance.handle_route_change(contest_name);
-    }
+	if (wrapper.contest_page_instance) {
+		wrapper.contest_page_instance.handle_route_change(contest_name);
+	}
 };
 
-
 class ContestPage {
+	constructor(wrapper) {
+		this.wrapper = wrapper;
+		wrapper.contest_page_instance = this;
 
-    constructor(wrapper) {
-        this.wrapper = wrapper;
-        wrapper.contest_page_instance = this;
+		this.page = frappe.ui.make_app_page({
+			parent: wrapper,
+			title: "Contests",
+			single_column: true,
+		});
 
-        this.page = frappe.ui.make_app_page({
-            parent: wrapper,
-            title: "Contests",
-            single_column: true
-        });
+		this.contest_name = frappe.get_route()[1];
+		this.add_styles();
 
-        this.contest_name = frappe.get_route()[1];
-        this.add_styles();
+		if (this.contest_name) {
+			this.render_details();
+			this.load_contest();
+		} else {
+			this.render_listing();
+			this.load_contests();
+		}
+	}
 
-        if (this.contest_name) {
-            this.render_details();
-            this.load_contest();
-        } else {
-            this.render_listing();
-            this.load_contests();
-        }
-    }
+	handle_route_change(contest_name) {
+		this.contest_name = contest_name;
 
-    handle_route_change(contest_name) {
-        this.contest_name = contest_name;
+		if (contest_name) {
+			this.render_details();
+			this.load_contest();
+		} else {
+			this.render_listing();
+			this.load_contests();
+		}
+	}
 
-        if (contest_name) {
-            this.render_details();
-            this.load_contest();
-        } else {
-            this.render_listing();
-            this.load_contests();
-        }
-    }
-
-    /* =========================================================
+	/* =========================================================
        LISTING
        ========================================================= */
 
-    render_listing() {
-        $(this.wrapper).find(".layout-main-section").html(`
+	render_listing() {
+		$(this.wrapper).find(".layout-main-section").html(`
             <div class="contest-page">
                 <div class="contest-hero">
                     <div class="hero-content">
@@ -83,27 +81,31 @@ class ContestPage {
                 </div>
             </div>
         `);
-    }
+	}
 
-    async load_contests() {
-        try {
-            const [contestsRes, myContestsRes] = await Promise.all([
-                frappe.call({
-                    method: "dsa.api.get_contests",
-                    args: { limit_start: 0, limit_page_length: 100 }
-                }),
-                frappe.session.user !== "Guest" ? frappe.call({
-                    method: "dsa.dsa.doctype.contest_registration.contest_registration.get_my_contests"
-                }).catch(() => ({ message: [] })) : Promise.resolve({ message: [] })
-            ]);
+	async load_contests() {
+		try {
+			const [contestsRes, myContestsRes] = await Promise.all([
+				frappe.call({
+					method: "dsa.api.get_contests",
+					args: { limit_start: 0, limit_page_length: 100 },
+				}),
+				frappe.session.user !== "Guest"
+					? frappe
+							.call({
+								method: "dsa.dsa.doctype.contest_registration.contest_registration.get_my_contests",
+							})
+							.catch(() => ({ message: [] }))
+					: Promise.resolve({ message: [] }),
+			]);
 
-            const contests = contestsRes.message || [];
-            const myContests = myContestsRes.message || [];
+			const contests = contestsRes.message || [];
+			const myContests = myContestsRes.message || [];
 
-            this.render_contests(contests, myContests);
-        } catch (error) {
-            console.error("Failed to load contests:", error);
-            $(".contest-content").html(`
+			this.render_contests(contests, myContests);
+		} catch (error) {
+			console.error("Failed to load contests:", error);
+			$(".contest-content").html(`
                 <div class="contest-state">
                     <div class="state-icon error">!</div>
                     <h3>Unable to load contests</h3>
@@ -111,42 +113,80 @@ class ContestPage {
                     <button class="contest-retry">Try Again</button>
                 </div>
             `);
-            $(".contest-retry").on("click", () => this.load_contests());
-        }
-    }
+			$(".contest-retry").on("click", () => this.load_contests());
+		}
+	}
 
-    render_contests(contests, myContests = []) {
-        if (!contests.length && !myContests.length) {
-            $(".contest-content").html(`
+	render_contests(contests, myContests = []) {
+		if (!contests.length && !myContests.length) {
+			$(".contest-content").html(`
                 <div class="contest-state">
                     <div class="state-icon">☰</div>
                     <h3>No contests available</h3>
                     <p>Check back later for upcoming competitions.</p>
                 </div>
             `);
-            return;
-        }
+			return;
+		}
 
-        const registeredNames = new Set(myContests.map(c => c.contest || c.name));
+		const registeredNames = new Set(myContests.map((c) => c.contest || c.name));
 
-        const upcoming = contests.filter(c => c.status === "Upcoming");
-        const running = contests.filter(c => c.status === "Active");
-        const ended = contests.filter(c => c.status === "Completed");
+		const upcoming = contests.filter((c) => c.status === "Upcoming");
+		const running = contests.filter((c) => c.status === "Active");
+		const ended = contests.filter((c) => c.status === "Completed");
 
-        $(".contest-content").html(`
-            ${myContests.length ? this.render_section("My Registered Contests", "Contests you have enrolled in", myContests, "registered", true) : ""}
-            ${this.render_section("Running", "Contests happening right now", running, "running", false, registeredNames)}
-            ${this.render_section("Upcoming", "Get ready for the next challenge", upcoming, "upcoming", false, registeredNames)}
-            ${this.render_section("Ended", "Previous competitions", ended, "ended", false, registeredNames)}
+		$(".contest-content").html(`
+            ${
+				myContests.length
+					? this.render_section(
+							"My Registered Contests",
+							"Contests you have enrolled in",
+							myContests,
+							"registered",
+							true
+					  )
+					: ""
+			}
+            ${this.render_section(
+				"Running",
+				"Contests happening right now",
+				running,
+				"running",
+				false,
+				registeredNames
+			)}
+            ${this.render_section(
+				"Upcoming",
+				"Get ready for the next challenge",
+				upcoming,
+				"upcoming",
+				false,
+				registeredNames
+			)}
+            ${this.render_section(
+				"Ended",
+				"Previous competitions",
+				ended,
+				"ended",
+				false,
+				registeredNames
+			)}
         `);
 
-        this.bind_listing_events();
-    }
+		this.bind_listing_events();
+	}
 
-    render_section(title, subtitle, contests, type, isMySection = false, registeredNames = new Set()) {
-        if (!contests.length) return "";
+	render_section(
+		title,
+		subtitle,
+		contests,
+		type,
+		isMySection = false,
+		registeredNames = new Set()
+	) {
+		if (!contests.length) return "";
 
-        return `
+		return `
             <section class="contest-section ${type}-section">
                 <div class="section-heading">
                     <div class="section-title-wrapper">
@@ -162,30 +202,50 @@ class ContestPage {
                 </div>
 
                 <div class="contest-grid">
-                    ${contests.map(contest => this.render_card(contest, type, registeredNames.has(contest.name || contest.contest))).join("")}
+                    ${contests
+						.map((contest) =>
+							this.render_card(
+								contest,
+								type,
+								registeredNames.has(contest.name || contest.contest)
+							)
+						)
+						.join("")}
                 </div>
             </section>
         `;
-    }
+	}
 
-    render_card(contest, type, isRegistered = false) {
-        const contestName = contest.contest || contest.name;
-        const start = this.format_date(contest.start_date);
-        const duration = this.calculate_duration(contest.start_date, contest.end_date);
-        const problemCount = contest.problem_count !== undefined ? contest.problem_count : (contest.problems ? contest.problems.length : "—");
-        const description = this.strip_html(contest.description) || "Put your problem-solving skills to the test.";
+	render_card(contest, type, isRegistered = false) {
+		const contestName = contest.contest || contest.name;
+		const start = this.format_date(contest.start_date);
+		const duration = this.calculate_duration(contest.start_date, contest.end_date);
+		const problemCount =
+			contest.problem_count !== undefined
+				? contest.problem_count
+				: contest.problems
+				? contest.problems.length
+				: "—";
+		const description =
+			this.strip_html(contest.description) || "Put your problem-solving skills to the test.";
 
-        const cardType = contest.status ? this.get_status_type(contest.status) : type;
+		const cardType = contest.status ? this.get_status_type(contest.status) : type;
 
-        return `
-            <article class="contest-card ${cardType}" data-contest="${this.escape_html(contestName)}">
+		return `
+            <article class="contest-card ${cardType}" data-contest="${this.escape_html(
+			contestName
+		)}">
                 <div class="card-top">
                     <div class="card-badges">
                         <span class="contest-status ${cardType}">
                             <span class="status-dot"></span>
                             ${this.get_status_label(cardType)}
                         </span>
-                        ${isRegistered ? `<span class="registered-badge"><i class="fa fa-check"></i> Enrolled</span>` : ""}
+                        ${
+							isRegistered
+								? `<span class="registered-badge"><i class="fa fa-check"></i> Enrolled</span>`
+								: ""
+						}
                     </div>
                     <span class="contest-code">${this.escape_html(contestName)}</span>
                 </div>
@@ -223,7 +283,11 @@ class ContestPage {
 
                 <div class="card-footer">
                     <span class="contest-end">
-                        ${cardType === "ended" ? `Ended ${this.format_date(contest.end_date)}` : `Ends ${this.format_date(contest.end_date)}`}
+                        ${
+							cardType === "ended"
+								? `Ended ${this.format_date(contest.end_date)}`
+								: `Ends ${this.format_date(contest.end_date)}`
+						}
                     </span>
 
                     <button class="view-contest" data-contest="${this.escape_html(contestName)}">
@@ -232,32 +296,32 @@ class ContestPage {
                 </div>
             </article>
         `;
-    }
+	}
 
-    bind_listing_events() {
-        $(".view-contest").on("click", (event) => {
-            event.stopPropagation();
-            const contest_name = $(event.currentTarget).data("contest");
-            this.open_contest(contest_name);
-        });
+	bind_listing_events() {
+		$(".view-contest").on("click", (event) => {
+			event.stopPropagation();
+			const contest_name = $(event.currentTarget).data("contest");
+			this.open_contest(contest_name);
+		});
 
-        $(".contest-card").on("click", (event) => {
-            if ($(event.target).closest(".view-contest").length) return;
-            const contest_name = $(event.currentTarget).data("contest");
-            this.open_contest(contest_name);
-        });
-    }
+		$(".contest-card").on("click", (event) => {
+			if ($(event.target).closest(".view-contest").length) return;
+			const contest_name = $(event.currentTarget).data("contest");
+			this.open_contest(contest_name);
+		});
+	}
 
-    open_contest(contest_name) {
-        frappe.set_route("contest-page", contest_name);
-    }
+	open_contest(contest_name) {
+		frappe.set_route("contest-page", contest_name);
+	}
 
-    /* =========================================================
+	/* =========================================================
        DETAILS
        ========================================================= */
 
-    render_details() {
-        $(this.wrapper).find(".layout-main-section").html(`
+	render_details() {
+		$(this.wrapper).find(".layout-main-section").html(`
             <div class="contest-page">
                 <div class="contest-details-page">
                     <button class="back-to-contests">
@@ -271,73 +335,84 @@ class ContestPage {
                 </div>
             </div>
         `);
-    }
+	}
 
-    async load_contest() {
-        try {
-            const [contestRes, statusRes] = await Promise.all([
-                frappe.call({
-                    method: "dsa.api.get_contest",
-                    args: { name: this.contest_name }
-                }),
-                frappe.call({
-                    method: "dsa.dsa.doctype.contest_registration.contest_registration.get_participant_status",
-                    args: { contest: this.contest_name }
-                }).catch(() => ({ message: { registered: false } }))
-            ]);
+	async load_contest() {
+		try {
+			const [contestRes, statusRes] = await Promise.all([
+				frappe.call({
+					method: "dsa.api.get_contest",
+					args: { name: this.contest_name },
+				}),
+				frappe
+					.call({
+						method: "dsa.dsa.doctype.contest_registration.contest_registration.get_participant_status",
+						args: { contest: this.contest_name },
+					})
+					.catch(() => ({ message: { registered: false } })),
+			]);
 
-            const contest = contestRes.message;
-            const participantStatus = statusRes.message || { registered: false };
+			const contest = contestRes.message;
+			const participantStatus = statusRes.message || { registered: false };
 
-            if (!contest) {
-                this.render_not_found();
-                return;
-            }
+			if (!contest) {
+				this.render_not_found();
+				return;
+			}
 
-            this.render_contest_details(contest, participantStatus);
-        } catch (error) {
-            console.error("Failed to load contest:", error);
-            this.render_error();
-        }
-    }
+			this.render_contest_details(contest, participantStatus);
+		} catch (error) {
+			console.error("Failed to load contest:", error);
+			this.render_error();
+		}
+	}
 
-    render_contest_details(contest, participantStatus) {
-        const type = this.get_status_type(contest.status);
-        const description = this.strip_html(contest.description) || "No description available for this contest.";
-        const duration = this.calculate_duration(contest.start_date, contest.end_date);
-        const problems = contest.problems || [];
-        const isRegistered = participantStatus && participantStatus.registered;
-        const isEnded = type === "ended";
+	render_contest_details(contest, participantStatus) {
+		const type = this.get_status_type(contest.status);
+		const description =
+			this.strip_html(contest.description) || "No description available for this contest.";
+		const duration = this.calculate_duration(contest.start_date, contest.end_date);
+		const problems = contest.problems || [];
+		const isRegistered = participantStatus && participantStatus.registered;
+		const isEnded = type === "ended";
 
-        let actionButtonsHtml = "";
-        if (isRegistered) {
-            actionButtonsHtml = `
+		let actionButtonsHtml = "";
+		if (isRegistered) {
+			actionButtonsHtml = `
                 <div class="contest-actions-wrapper">
-                    <button class="contest-enter-btn" data-contest="${this.escape_html(contest.name)}">
+                    <button class="contest-enter-btn" data-contest="${this.escape_html(
+						contest.name
+					)}">
                         <i class="fa fa-sign-in"></i> Enter Contest
                     </button>
-                    ${!isEnded ? `
-                    <button class="contest-leave-btn" data-contest="${this.escape_html(contest.name)}">
+                    ${
+						!isEnded
+							? `
+                    <button class="contest-leave-btn" data-contest="${this.escape_html(
+						contest.name
+					)}">
                         Leave Contest
                     </button>
-                    ` : ""}
+                    `
+							: ""
+					}
                 </div>
             `;
-        } else if (isEnded) {
-            actionButtonsHtml = `
+		} else if (isEnded) {
+			actionButtonsHtml = `
                 <button class="contest-join-btn disabled" disabled>
                     Contest Ended
                 </button>
             `;
-        } else {
-            actionButtonsHtml = `
+		} else {
+			actionButtonsHtml = `
                 <button class="contest-join-btn" data-contest="${this.escape_html(contest.name)}">
                     Join Contest
                 </button>
             `;
-        }
+		}
 
-        $(".contest-details-page").html(`
+		$(".contest-details-page").html(`
             <!-- BACK -->
             <button class="back-to-contests">
                 <span>←</span> Back to Contests
@@ -351,7 +426,11 @@ class ContestPage {
                             <span class="status-dot"></span>
                             ${this.get_status_label(type)}
                         </span>
-                        ${isRegistered ? `<span class="registered-badge"><i class="fa fa-check"></i> Enrolled</span>` : ""}
+                        ${
+							isRegistered
+								? `<span class="registered-badge"><i class="fa fa-check"></i> Enrolled</span>`
+								: ""
+						}
                         <span class="details-contest-code">${this.escape_html(contest.name)}</span>
                     </div>
 
@@ -425,7 +504,11 @@ class ContestPage {
                     <div class="about-icon"><i class="fa fa-info-circle"></i></div>
                     <div class="about-content">
                         <div class="contest-description-full">
-                            ${contest.description ? contest.description : "<p>No additional instructions provided.</p>"}
+                            ${
+								contest.description
+									? contest.description
+									: "<p>No additional instructions provided.</p>"
+							}
                         </div>
                     </div>
                 </div>
@@ -441,11 +524,20 @@ class ContestPage {
                     </div>
                 </div>
 
-                ${problems.length ? `
+                ${
+					problems.length
+						? `
                     <div class="contest-problems">
-                        ${problems.map((p, idx) => `
-                            <div class="problem-card" data-problem="${this.escape_html(p.problem)}">
-                                <div class="problem-number">${String(idx + 1).padStart(2, "0")}</div>
+                        ${problems
+							.map(
+								(p, idx) => `
+                            <div class="problem-card" data-problem="${this.escape_html(
+								p.problem
+							)}">
+                                <div class="problem-number">${String(idx + 1).padStart(
+									2,
+									"0"
+								)}</div>
                                 <div class="problem-main">
                                     <div class="problem-title">${this.escape_html(p.problem)}</div>
                                     <div class="problem-meta">Order: ${p.order || idx + 1}</div>
@@ -456,15 +548,19 @@ class ContestPage {
                                 </div>
                                 <div class="problem-arrow">→</div>
                             </div>
-                        `).join("")}
+                        `
+							)
+							.join("")}
                     </div>
-                ` : `
+                `
+						: `
                     <div class="problems-placeholder">
                         <div class="placeholder-icon"><i class="fa fa-lock"></i></div>
                         <h3>Problems hidden or not published</h3>
                         <p>Contest problems will appear here once published.</p>
                     </div>
-                `}
+                `
+				}
             </section>
 
             <!-- LEADERBOARD -->
@@ -486,117 +582,118 @@ class ContestPage {
             </section>
         `);
 
-        this.load_leaderboard();
-        this.bind_details_events(contest, isRegistered);
-    }
+		this.load_leaderboard();
+		this.bind_details_events(contest, isRegistered);
+	}
 
-    bind_details_events(contest, isRegistered) {
-        $(".back-to-contests").on("click", () => {
-            frappe.set_route("contest-page");
-        });
+	bind_details_events(contest, isRegistered) {
+		$(".back-to-contests").on("click", () => {
+			frappe.set_route("contest-page");
+		});
 
-        $(".contest-enter-btn").on("click", () => {
-            frappe.set_route("contest-comp", this.contest_name);
-        });
+		$(".contest-enter-btn").on("click", () => {
+			frappe.set_route("contest-comp", this.contest_name);
+		});
 
-        $(".problem-card").on("click", () => {
-            if (isRegistered) {
-                frappe.set_route("contest-comp", this.contest_name);
-            } else {
-                frappe.msgprint({
-                    title: __("Registration Required"),
-                    message: __("Please join this contest first to access the challenges."),
-                    indicator: "orange"
-                });
-            }
-        });
+		$(".problem-card").on("click", () => {
+			if (isRegistered) {
+				frappe.set_route("contest-comp", this.contest_name);
+			} else {
+				frappe.msgprint({
+					title: __("Registration Required"),
+					message: __("Please join this contest first to access the challenges."),
+					indicator: "orange",
+				});
+			}
+		});
 
-        $(".contest-join-btn:not(.disabled)").on("click", async (event) => {
-            const btn = $(event.currentTarget);
-            btn.prop("disabled", true).text("Joining...");
+		$(".contest-join-btn:not(.disabled)").on("click", async (event) => {
+			const btn = $(event.currentTarget);
+			btn.prop("disabled", true).text("Joining...");
 
-            try {
-                const res = await frappe.call({
-                    method: "dsa.dsa.doctype.contest_registration.contest_registration.join_contest",
-                    args: { contest: this.contest_name }
-                });
+			try {
+				const res = await frappe.call({
+					method: "dsa.dsa.doctype.contest_registration.contest_registration.join_contest",
+					args: { contest: this.contest_name },
+				});
 
-                frappe.show_alert({
-                    message: res.message?.message || __("Successfully joined the contest!"),
-                    indicator: "green"
-                });
+				frappe.show_alert({
+					message: res.message?.message || __("Successfully joined the contest!"),
+					indicator: "green",
+				});
 
-                frappe.set_route("contest-comp", this.contest_name);
-            } catch (err) {
-                btn.prop("disabled", false).text("Join Contest");
-                const msg = err?.messages ? err.messages.join(" ") : (err?.message || __("Could not join contest."));
-                frappe.show_alert({ message: msg, indicator: "red" });
-            }
-        });
+				frappe.set_route("contest-comp", this.contest_name);
+			} catch (err) {
+				btn.prop("disabled", false).text("Join Contest");
+				const msg = err?.messages
+					? err.messages.join(" ")
+					: err?.message || __("Could not join contest.");
+				frappe.show_alert({ message: msg, indicator: "red" });
+			}
+		});
 
-        $(".contest-leave-btn").on("click", async () => {
-            frappe.confirm(
-                __("Are you sure you want to leave this contest?"),
-                async () => {
-                    try {
-                        const res = await frappe.call({
-                            method: "dsa.dsa.doctype.contest_registration.contest_registration.leave_contest",
-                            args: { contest: this.contest_name }
-                        });
+		$(".contest-leave-btn").on("click", async () => {
+			frappe.confirm(__("Are you sure you want to leave this contest?"), async () => {
+				try {
+					const res = await frappe.call({
+						method: "dsa.dsa.doctype.contest_registration.contest_registration.leave_contest",
+						args: { contest: this.contest_name },
+					});
 
-                        frappe.show_alert({
-                            message: res.message?.message || __("You have left the contest."),
-                            indicator: "orange"
-                        });
+					frappe.show_alert({
+						message: res.message?.message || __("You have left the contest."),
+						indicator: "orange",
+					});
 
-                        this.load_contest();
-                    } catch (err) {
-                        const msg = err?.messages ? err.messages.join(" ") : (err?.message || __("Could not leave contest."));
-                        frappe.show_alert({ message: msg, indicator: "red" });
-                    }
-                }
-            );
-        });
-    }
+					this.load_contest();
+				} catch (err) {
+					const msg = err?.messages
+						? err.messages.join(" ")
+						: err?.message || __("Could not leave contest.");
+					frappe.show_alert({ message: msg, indicator: "red" });
+				}
+			});
+		});
+	}
 
-    async load_leaderboard() {
-        try {
-            const res = await frappe.call({
-                method: "dsa.api.get_contest_leaderboard",
-                args: {
-                    contest: this.contest_name
-                }
-            });
+	async load_leaderboard() {
+		try {
+			const res = await frappe.call({
+				method: "dsa.api.get_contest_leaderboard",
+				args: {
+					contest: this.contest_name,
+				},
+			});
 
-            const leaderboard = res.message?.leaderboard || [];
+			const leaderboard = res.message?.leaderboard || [];
 
-            this.render_leaderboard(leaderboard);
-        } catch (error) {
-            console.error("Failed to load leaderboard:", error);
+			this.render_leaderboard(leaderboard);
+		} catch (error) {
+			console.error("Failed to load leaderboard:", error);
 
-            $(".contest-leaderboard").html(`
+			$(".contest-leaderboard").html(`
                 <div class="contest-state">
                     <div class="state-icon error">!</div>
                     <h3>Unable to load leaderboard</h3>
                     <p>Something went wrong while loading the leaderboard.</p>
                 </div>
             `);
-        }
-    }
+		}
+	}
 
-    render_leaderboard(leaderboard) {
-        if (!leaderboard.length) {
-            $(".contest-leaderboard").html(`
+	render_leaderboard(leaderboard) {
+		if (!leaderboard.length) {
+			$(".contest-leaderboard").html(`
                 <div class="problems-placeholder">
                     <div class="placeholder-icon">🏆</div>
                     <h3>No participants yet</h3>
                     <p>The leaderboard will appear once participants join the contest.</p>
                 </div>
             `);
-            return;
-        }
+			return;
+		}
 
-        $(".contest-leaderboard").html(`
+		$(".contest-leaderboard").html(`
             <div class="leaderboard-table-wrapper">
                 <table class="leaderboard-table">
                     <thead>
@@ -611,7 +708,9 @@ class ContestPage {
                     </thead>
 
                     <tbody>
-                        ${leaderboard.map(row => `
+                        ${leaderboard
+							.map(
+								(row) => `
                             <tr>
                                 <td>
                                     <span class="leaderboard-rank">
@@ -643,16 +742,17 @@ class ContestPage {
                                     ${row.time ? this.format_date(row.time) : "—"}
                                 </td>
                             </tr>
-                        `).join("")}
+                        `
+							)
+							.join("")}
                     </tbody>
                 </table>
             </div>
         `);
-    }
+	}
 
-
-    render_not_found() {
-        $(".contest-details-page").html(`
+	render_not_found() {
+		$(".contest-details-page").html(`
             <button class="back-to-contests"><span>←</span> Back to Contests</button>
             <div class="contest-state">
                 <div class="state-icon">?</div>
@@ -660,11 +760,11 @@ class ContestPage {
                 <p>The requested contest could not be found or has been removed.</p>
             </div>
         `);
-        $(".back-to-contests").on("click", () => frappe.set_route("contest-page"));
-    }
+		$(".back-to-contests").on("click", () => frappe.set_route("contest-page"));
+	}
 
-    render_error() {
-        $(".contest-details-page").html(`
+	render_error() {
+		$(".contest-details-page").html(`
             <button class="back-to-contests"><span>←</span> Back to Contests</button>
             <div class="contest-state">
                 <div class="state-icon error">!</div>
@@ -673,79 +773,79 @@ class ContestPage {
                 <button class="contest-retry">Retry</button>
             </div>
         `);
-        $(".back-to-contests").on("click", () => frappe.set_route("contest-page"));
-        $(".contest-retry").on("click", () => this.load_contest());
-    }
+		$(".back-to-contests").on("click", () => frappe.set_route("contest-page"));
+		$(".contest-retry").on("click", () => this.load_contest());
+	}
 
-    /* =========================================================
+	/* =========================================================
        HELPERS
        ========================================================= */
 
-    get_status_type(status) {
-        const s = (status || "").toLowerCase();
-        if (s === "active") return "running";
-        if (s === "upcoming") return "upcoming";
-        return "ended";
-    }
+	get_status_type(status) {
+		const s = (status || "").toLowerCase();
+		if (s === "active") return "running";
+		if (s === "upcoming") return "upcoming";
+		return "ended";
+	}
 
-    get_status_label(type) {
-        if (type === "running") return "Running";
-        if (type === "upcoming") return "Upcoming";
-        if (type === "registered") return "Enrolled";
-        return "Ended";
-    }
+	get_status_label(type) {
+		if (type === "running") return "Running";
+		if (type === "upcoming") return "Upcoming";
+		if (type === "registered") return "Enrolled";
+		return "Ended";
+	}
 
-    get_section_icon(type) {
-        if (type === "running") return "▶";
-        if (type === "upcoming") return "⏰";
-        if (type === "registered") return "★";
-        return "✓";
-    }
+	get_section_icon(type) {
+		if (type === "running") return "▶";
+		if (type === "upcoming") return "⏰";
+		if (type === "registered") return "★";
+		return "✓";
+	}
 
-    format_date(dateStr) {
-        if (!dateStr) return "—";
-        try {
-            return frappe.datetime.str_to_user(dateStr);
-        } catch {
-            return dateStr;
-        }
-    }
+	format_date(dateStr) {
+		if (!dateStr) return "—";
+		try {
+			return frappe.datetime.str_to_user(dateStr);
+		} catch {
+			return dateStr;
+		}
+	}
 
-    calculate_duration(startDate, endDate) {
-        if (!startDate || !endDate) return "—";
-        try {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            const diffMs = end - start;
-            if (diffMs <= 0) return "—";
+	calculate_duration(startDate, endDate) {
+		if (!startDate || !endDate) return "—";
+		try {
+			const start = new Date(startDate);
+			const end = new Date(endDate);
+			const diffMs = end - start;
+			if (diffMs <= 0) return "—";
 
-            const diffMins = Math.floor(diffMs / (1000 * 60));
-            const hours = Math.floor(diffMins / 60);
-            const mins = diffMins % 60;
-            const days = Math.floor(hours / 24);
-            const remHours = hours % 24;
+			const diffMins = Math.floor(diffMs / (1000 * 60));
+			const hours = Math.floor(diffMins / 60);
+			const mins = diffMins % 60;
+			const days = Math.floor(hours / 24);
+			const remHours = hours % 24;
 
-            if (days > 0) return `${days}d ${remHours}h`;
-            if (hours > 0) return `${hours}h ${mins}m`;
-            return `${mins}m`;
-        } catch {
-            return "—";
-        }
-    }
+			if (days > 0) return `${days}d ${remHours}h`;
+			if (hours > 0) return `${hours}h ${mins}m`;
+			return `${mins}m`;
+		} catch {
+			return "—";
+		}
+	}
 
-    strip_html(html) {
-        if (!html) return "";
-        return $("<div>").html(html).text().trim();
-    }
+	strip_html(html) {
+		if (!html) return "";
+		return $("<div>").html(html).text().trim();
+	}
 
-    escape_html(str) {
-        return frappe.utils.escape_html(str || "");
-    }
+	escape_html(str) {
+		return frappe.utils.escape_html(str || "");
+	}
 
-    add_styles() {
-        if ($("#contest-page-styles").length) return;
+	add_styles() {
+		if ($("#contest-page-styles").length) return;
 
-        $("head").append(`
+		$("head").append(`
 <style id="contest-page-styles">
 .contest-page { padding: 30px; max-width: 1400px; margin: 0 auto; color: #eee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 .contest-hero { display: flex; justify-content: space-between; align-items: center; padding: 40px; border-radius: 14px; background: linear-gradient(135deg, #1f1f1f 0%, #151515 100%); border: 1px solid #2e2e2e; margin-bottom: 35px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }
@@ -944,5 +1044,5 @@ class ContestPage {
 }
 </style>
         `);
-    }
+	}
 }
