@@ -71,13 +71,13 @@ class IntegrationTestContest(IntegrationTestCase):
 					"start_date": start,
 					"end_date": end,
 					"problems": [
-                        {
-                            "doctype": "Contest Problem",
-                            "problem": self.test_problem.name,
-                            "order": 1,
-                            "points": 100,
-                        }
-                    ],
+						{
+							"doctype": "Contest Problem",
+							"problem": self.test_problem.name,
+							"order": 1,
+							"points": 100,
+						}
+					],
 				}
 			)
 			with self.assertRaisesRegex(frappe.ValidationError, "End Date must be after Start Date"):
@@ -110,13 +110,13 @@ class IntegrationTestContest(IntegrationTestCase):
 				"end_date": now + timedelta(hours=1),
 				"status": "Completed",
 				"problems": [
-                    {
-                        "doctype": "Contest Problem",
-                        "problem": self.test_problem.name,
-                        "order": 1,
-                        "points": 100,
-                    }
-                ],
+					{
+						"doctype": "Contest Problem",
+						"problem": self.test_problem.name,
+						"order": 1,
+						"points": 100,
+					}
+				],
 			}
 		)
 		with patch("dsa.dsa.doctype.contest.contest.now_datetime", return_value=now):

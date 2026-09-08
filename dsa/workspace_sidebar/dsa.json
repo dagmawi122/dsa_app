@@ -1,0 +1,21 @@
+{
+ "doctype": "Workspace Sidebar",
+ "name": "DSA",
+ "title": "DSA",
+ "app": "dsa",
+ "module": "DSA",
+ "standard": 1,
+ "header_icon": "code",
+ "items": [
+  {"type": "Link", "label": "Manage Problems", "link_type": "DocType", "link_to": "DSAProblem", "icon": "square-pen"},
+  {"type": "Link", "label": "Topics", "link_type": "DocType", "link_to": "DSA Topic", "icon": "tag"},
+  {"type": "Link", "label": "DSA Submission", "link_type": "DocType", "link_to": "DSA Submission"},
+  {"type": "Link", "label": "Contest", "link_type": "DocType", "link_to": "Contest"},
+  {"type": "Link", "label": "Contest Registration", "link_type": "DocType", "link_to": "Contest Registration"},
+  {"type": "Section Break", "label": "Pages"},
+  {"type": "Link", "label": "Practice Problems", "link_type": "Page", "link_to": "list-problems", "icon": "list", "child": 1},
+  {"type": "Link", "label": "Contest Page", "link_type": "Page", "link_to": "contest-page", "icon": "panel-top", "child": 1},
+  {"type": "Link", "label": "Contest", "link_type": "Page", "link_to": "contest-comp", "icon": "panel-top", "child": 1},
+  {"type": "Link", "label": "Contest Problem", "link_type": "Page", "link_to": "contest-solve", "icon": "panel-top", "child": 1}
+ ]
+}

@@ -1,0 +1,12 @@
+{
+ "doctype": "DocType",
+ "name": "DSA Problem Topic",
+ "module": "DSA",
+ "istable": 1,
+ "editable_grid": 1,
+ "field_order": ["topic"],
+ "fields": [
+  {"fieldname": "topic", "fieldtype": "Link", "options": "DSA Topic", "label": "Topic", "reqd": 1, "in_list_view": 1}
+ ],
+ "permissions": []
+}

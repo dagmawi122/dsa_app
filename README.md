@@ -24,9 +24,42 @@ this to your site's `site_config.json`:
 }
 ```
 
-After installation, create `DSAProblem` records in Desk and open **DSA
-Practice** from the Apps screen. The editor supports C++ (Judge0 ID 54),
+After installation, create `DSAProblem` records in Desk and open **Practice
+Problems** from the Apps screen. The editor supports C++ (Judge0 ID 54),
 Python 3 (71), JavaScript (63), and Java (62).
+
+### Practice topics
+
+System Managers can create reusable records in **DSA Topic**, then open each
+**DSAProblem** and assign one or more entries in its **Topics** field. Existing
+problems remain untagged until an administrator categorizes them.
+
+The Apps screen opens `/app/list-problems`. Learners can select several topics to
+show problems matching **any** selected topic; clearing the selection shows all
+problems, including untagged ones. Selecting a problem opens its description and
+editor at `/app/dsa-practice/<slug>`, for example `/app/dsa-practice/two-sums`.
+**Back to problems** returns to the list without clearing its filters. Opening
+`/app/dsa-practice` without a problem redirects to the list. Each problem gets a
+unique saved slug; duplicate titles receive numbered suffixes, and title edits
+preserve existing links. The page heading includes the current problem title. The
+**Topics** control in the description reveals that problem's assigned topics.
+Contest problem selection continues to use the contest's own problem list.
+
+The DSA sidebar lists **Practice Problems** under **Pages** as the learner entry point.
+**Manage Problems** (`/app/dsaproblem`) opens the authoring list. The student
+practice list has no creation or management controls. It supports text search,
+difficulty filtering, and selecting multiple topics. Inside a problem, expanding
+**Topics** shows links below the label; selecting one opens
+`/app/list-problems?topic=<topic>` with that topic selected. Learners can then
+add more topics or clear the filter.
+
+Practice problem routes fill the viewport without the Desk sidebar or header.
+The **Problem list** button at the top returns to `/app/list-problems`, restoring
+the normal Desk layout. Both pages and the Monaco editor follow Frappe's active
+theme, including automatic OS theme changes when Frappe is in automatic mode.
+
+After updating the app, run `bench --site <site> migrate` to create the topic
+DocTypes and field, then `bench build --app dsa` to rebuild the interface.
 
 Each language has two fields on a problem:
 
