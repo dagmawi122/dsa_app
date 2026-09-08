@@ -32,7 +32,6 @@
                     <div class="dsa-meta">
                         <span class="dsa-difficulty">{{ problem.difficulty }}</span>
                         <span class="dsa-chip">◇ {{ __("Topics") }}</span>
-                        <span class="dsa-chip amber">▢ {{ __("Companies") }}</span>
                         <span class="dsa-chip">♧ {{ __("Hint") }}</span>
                     </div>
 
@@ -136,6 +135,18 @@
 
         <time>{{ formatSubmissionTime(submission) }}</time>
               </div>
+              <div class="dsa-submission-actions">
+                  <span>{{ submissionLanguage(submission) }}</span>
+                  <button type="button" :aria-expanded="expandedSubmission === submission.name"
+                      @click="expandedSubmission = expandedSubmission === submission.name ? null : submission.name">
+                      {{ expandedSubmission === submission.name ? __("Hide code") : __("View code") }}
+                  </button>
+                  <button type="button" :disabled="busy || typeof submission.code !== 'string'"
+                      @click="loadSubmissionCode(submission)">
+                      {{ __("Load into editor") }}
+                  </button>
+              </div>
+              <pre v-if="expandedSubmission === submission.name"><code>{{ submission.code ?? __("Code is unavailable for this submission.") }}</code></pre>
               </article>
                 </div>
             </div>
@@ -463,6 +474,7 @@ const resultRuntime = ref("");
 const activeProblemTab = ref("description");
 const activeResultTab = ref("testcase");
 const submissions = ref([]);
+const expandedSubmission = ref(null);
 const submissionsLoading = ref(false);
 const monacoEditor = ref(null);
 const practiceShell = ref(null);
@@ -654,6 +666,35 @@ async function loadSubmissions() {
     }
 }
 
+function submissionLanguage(submission) {
+    return languages.find((language) => language.id === Number(submission.language_id))?.label || __("Unknown language");
+}
+
+function loadSubmissionCode(submission) {
+    if (busy.value || typeof submission.code !== "string") return;
+    const languageId = Number(submission.language_id);
+    if (!languages.some((language) => language.id === languageId)) {
+        frappe.show_alert({ message: __("This submission's language is not supported."), indicator: "red" });
+        return;
+    }
+    const problemName = problem.value?.name;
+    const restore = () => {
+        if (busy.value || problem.value?.name !== problemName) return;
+        codeDrafts[selectedLanguageId.value] = code.value;
+        selectedLanguageId.value = languageId;
+        previousLanguageId = languageId;
+        codeDrafts[languageId] = submission.code;
+        code.value = submission.code;
+        clearResults();
+        frappe.show_alert({ message: __("Submission loaded into editor."), indicator: "green" });
+    };
+    if (code.value && (code.value !== submission.code || selectedLanguageId.value !== languageId)) {
+        frappe.confirm(__("Replace the current editor code with this submission? Unsaved changes in the target language will be replaced."), restore);
+    } else {
+        restore();
+    }
+}
+
 function setPanelWidth(clientX) {
     const bounds = practiceShell.value?.getBoundingClientRect();
 
@@ -766,6 +807,7 @@ function wait(milliseconds) {
 async function loadProblem(name) {
     if (!name) return;
 
+    expandedSubmission.value = null;
     generation += 1;
 
     problem.value = await call(
@@ -1337,6 +1379,24 @@ onBeforeUnmount(() => {
 
 .dsa-submission-card strong {
     font-weight: 600;
+}
+
+.dsa-submission-actions {
+    flex-wrap: wrap;
+}
+
+.dsa-submission-actions button {
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 5px 8px;
+    background: #333;
+    color: #eee;
+    cursor: pointer;
+}
+
+.dsa-submission-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .dsa-submission-main {
