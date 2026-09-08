@@ -76,7 +76,14 @@
 										}}</span>
 									</div>
 								</details>
-								<span class="dsa-chip">♧ {{ __("Hint") }}</span>
+								<button
+                                    v-if="problem.hint"
+                                    type="button"
+                                    class="dsa-chip hint-button"
+                                    @click="showHint = !showHint"
+                                >
+                                    ♧ {{ __("Hint") }}
+                                </button>
 							</div>
 
 							<section>
@@ -92,6 +99,10 @@
 								<h3>{{ __("Constraints") }}</h3>
 								<div class="dsa-rich-text" v-html="safeConstraints"></div>
 							</section>
+							<section v-if="problem.hint && showHint">
+                                <h3>{{ __("Hint") }}</h3>
+                                <div class="dsa-rich-text" v-html="safeHint"></div>
+                            </section>
 						</div>
 
 						<div v-else class="dsa-tab-content">
@@ -543,6 +554,7 @@ const activeResultCaseIndex = ref(0);
 const overallStatus = ref("");
 const resultRuntime = ref("");
 const activeProblemTab = ref("description");
+const showHint = ref(false);
 const activeResultTab = ref("testcase");
 const submissions = ref([]);
 const expandedSubmission = ref(null);
@@ -564,6 +576,8 @@ const safeDescription = computed(() => sanitize(problem.value?.description));
 const safeExamples = computed(() => sanitize(problem.value?.examples));
 
 const safeConstraints = computed(() => sanitize(problem.value?.constraints));
+
+const safeHint = computed(() => sanitize(problem.value?.hint));
 
 const panelStyle = computed(() => ({
 	"--left-panel-width": `${leftPanelWidth.value}%`,
@@ -887,6 +901,7 @@ async function loadProblem(name, slug = null) {
 	clearResults();
 
 	activeProblemTab.value = "description";
+	showHint.value = false;
 	activeResultTab.value = "testcase";
 	submissions.value = [];
 

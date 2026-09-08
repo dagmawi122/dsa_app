@@ -16,6 +16,7 @@
   {"type": "Link", "label": "Practice Problems", "link_type": "Page", "link_to": "list-problems", "icon": "list", "child": 1},
   {"type": "Link", "label": "Contest Page", "link_type": "Page", "link_to": "contest-page", "icon": "panel-top", "child": 1},
   {"type": "Link", "label": "Contest", "link_type": "Page", "link_to": "contest-comp", "icon": "panel-top", "child": 1},
-  {"type": "Link", "label": "Contest Problem", "link_type": "Page", "link_to": "contest-solve", "icon": "panel-top", "child": 1}
+  {"type": "Link", "label": "Contest Problem", "link_type": "Page", "link_to": "contest-solve", "icon": "panel-top", "child": 1},
+  {"type": "Link", "label": "Leaderboard", "link_type": "Page", "link_to": "leaderboard", "icon": "trophy", "child": 1}
  ]
 }

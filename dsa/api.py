@@ -142,6 +142,7 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 		"title": problem.title,
 		"description": problem.description,
 		"difficulty": problem.difficulty,
+		"hint": problem.hint,
 		"topics": [row.topic for row in problem.get("topics", [])],
 		"examples": problem.examples,
 		"constraints": problem.constraints,
