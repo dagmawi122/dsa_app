@@ -279,6 +279,7 @@ def get_submissions(problem: str) -> list[dict[str, Any]]:
 			"total_count",
 			"code",
 			"creation",
+            "runtime",
 		],
 		order_by="creation desc",
 		limit_page_length=50,
@@ -1411,13 +1412,24 @@ def submit_code(
 def _normalized_output(value: str | None) -> str:
 	return (value or "").replace("\r\n", "\n").rstrip()
 
-
 def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]:
     pending = False
     passed = 0
+    total_runtime = 0.0
     public_results = []
 
     for row in doc.results:
+        result = _get_judge0_submission(row.token)
+        judge_status = result.get("status") or {}
+
+        judge_runtime = result.get("time")
+
+        if judge_runtime is not None:
+            try:
+                total_runtime += float(judge_runtime)
+            except (TypeError, ValueError):
+                pass
+
         if row.status in {"Accepted", "Failed"}:
             passed += row.status == "Accepted"
 
@@ -1433,9 +1445,6 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
             )
 
             continue
-
-        result = _get_judge0_submission(row.token)
-        judge_status = result.get("status") or {}
 
         if judge_status.get("id") in PENDING_STATUS_IDS:
             pending = True
@@ -1482,6 +1491,7 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
         )
 
     doc.passed_count = passed
+    doc.runtime = total_runtime
 
     complexity_rejected = (
         doc.complexity_result == "Too Complex"
@@ -1507,6 +1517,7 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
         "display_status": "Rejected" if complexity_rejected else doc.status,
         "passed_count": doc.passed_count,
         "total_count": doc.total_count,
+        "runtime": doc.runtime,
         "results": public_results,
         "time_complexity": doc.time_complexity,
         "space_complexity": doc.space_complexity,

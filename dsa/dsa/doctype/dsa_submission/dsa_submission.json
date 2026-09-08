@@ -15,7 +15,8 @@
   "time_complexity",
   "space_complexity",
   "complexity_result",
-  "space_complexity_result"
+  "space_complexity_result",
+  "runtime"
  ],
  "fields": [
   {
@@ -96,10 +97,15 @@
    "fieldname": "space_complexity_result",
    "fieldtype": "Data",
    "label": "Space Complexity Result"
+  },
+  {
+   "fieldname": "runtime",
+   "fieldtype": "Float",
+   "label": "Runtime"
   }
  ],
  "links": [],
- "modified": "2026-09-04 15:10:46.757424",
+ "modified": "2026-09-08 21:37:00.756973",
  "modified_by": "Administrator",
  "module": "DSA",
  "name": "DSA Submission",

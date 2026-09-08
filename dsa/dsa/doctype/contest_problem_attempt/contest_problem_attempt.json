@@ -53,18 +53,32 @@
  "name": "Contest Problem Attempt",
  "owner": "Administrator",
  "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  }
+    {
+        "create": 1,
+        "delete": 1,
+        "email": 1,
+        "export": 1,
+        "print": 1,
+        "read": 1,
+        "report": 1,
+        "role": "System Manager",
+        "share": 1,
+        "write": 1
+    },
+    {
+        "read": 1,
+        "role": "LMS Student"
+    },
+    {
+        "read": 1,
+        "role": "LMS Instructor"
+    },
+    {
+        "create": 1,
+        "read": 1,
+        "write": 1,
+        "role": "Course Creator"
+    }
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,

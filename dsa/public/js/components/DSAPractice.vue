@@ -134,8 +134,12 @@
             {{ __("passed") }}
         </span>
 
+        <span v-if="submission.runtime != null">
+            {{ (Number(submission.runtime) * 1000).toFixed(0) }} {{ __("ms") }}
+        </span>
+
         <time>{{ formatSubmissionTime(submission) }}</time>
-              </div>
+    </div>
               </article>
                 </div>
             </div>

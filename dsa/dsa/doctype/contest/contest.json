@@ -70,22 +70,37 @@
  "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  }
+    {
+        "create": 1,
+        "delete": 1,
+        "email": 1,
+        "export": 1,
+        "print": 1,
+        "read": 1,
+        "report": 1,
+        "role": "System Manager",
+        "share": 1,
+        "write": 1
+    },
+    {
+        "read": 1,
+        "role": "LMS Student"
+    },
+    {
+        "read": 1,
+        "role": "LMS Instructor"
+    },
+    {
+        "create": 1,
+        "read": 1,
+        "write": 1,
+        "role": "Course Creator"
+    }
  ],
  "row_format": "Dynamic",
  "sort_field": "start_date",
  "sort_order": "DESC",
  "states": [],
  "track_changes": 1
+
 }
