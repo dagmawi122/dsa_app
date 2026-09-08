@@ -65,7 +65,10 @@ onMounted(async () => {
 	});
 	editor.onDidChangeModelContent(() => emit("update:modelValue", editor.getValue()));
 	themeObserver = new MutationObserver(() => monaco.editor.setTheme(editorTheme()));
-	themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+	themeObserver.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ["data-theme"],
+	});
 });
 
 watch(
