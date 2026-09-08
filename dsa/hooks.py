@@ -8,8 +8,8 @@ app_license = "mit"
 add_to_apps_screen = [
 	{
 		"name": "dsa",
-		"title": "DSA Practice",
-		"route": "/app/dsa-practice",
+		"title": "Practice Problems",
+		"route": "/app/list-problems",
 	},
 ]
 

@@ -18,6 +18,12 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 const editorContainer = ref(null);
 let editor = null;
+let themeObserver;
+let disposed = false;
+
+function editorTheme() {
+	return document.documentElement.getAttribute("data-theme") === "dark" ? "vs-dark" : "vs";
+}
 
 function loadMonaco() {
 	if (window.monaco) return Promise.resolve(window.monaco);
@@ -45,10 +51,11 @@ function loadMonaco() {
 
 onMounted(async () => {
 	const monaco = await loadMonaco();
+	if (disposed) return;
 	editor = monaco.editor.create(editorContainer.value, {
 		value: props.modelValue,
 		language: props.language,
-		theme: "vs-dark",
+		theme: editorTheme(),
 		automaticLayout: true,
 		minimap: { enabled: false },
 		fontSize: 14,
@@ -57,6 +64,8 @@ onMounted(async () => {
 		padding: { top: 12, bottom: 12 },
 	});
 	editor.onDidChangeModelContent(() => emit("update:modelValue", editor.getValue()));
+	themeObserver = new MutationObserver(() => monaco.editor.setTheme(editorTheme()));
+	themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 });
 
 watch(
@@ -80,6 +89,8 @@ function layout() {
 defineExpose({ layout });
 
 onBeforeUnmount(() => {
+	disposed = true;
+	themeObserver?.disconnect();
 	editor?.dispose();
 	editor = null;
 });

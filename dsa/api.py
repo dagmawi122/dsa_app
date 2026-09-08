@@ -139,9 +139,11 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 	}
 	return {
 		"name": problem.name,
+		"route_slug": problem.route_slug,
 		"title": problem.title,
 		"description": problem.description,
 		"difficulty": problem.difficulty,
+		"topics": [row.topic for row in problem.get("topics", [])],
 		"examples": problem.examples,
 		"constraints": problem.constraints,
 		"starter_code": starter_codes[str(DEFAULT_LANGUAGE_ID)],
@@ -158,16 +160,30 @@ def get_problems() -> list[dict[str, Any]]:
 	_require_login()
 	problems = frappe.get_all(
 		"DSAProblem",
-		fields=["name", "title", "difficulty"],
+		fields=["name", "title", "difficulty", "route_slug"],
 		order_by="title asc",
 	)
+	topics_by_problem = {}
+	for row in frappe.get_all(
+		"DSA Problem Topic",
+		filters={"parenttype": "DSAProblem", "parentfield": "topics"},
+		fields=["parent", "topic"],
+		order_by="idx asc",
+	):
+		topics_by_problem.setdefault(row.parent, []).append(row.topic)
+	for problem in problems:
+		problem["topics"] = topics_by_problem.get(problem.name, [])
 	difficulty_order = {"easy": 0, "medium": 1, "hard": 2}
 	return sorted(problems, key=lambda problem: (difficulty_order.get(problem.difficulty, 3), problem.title))
 
 
 @frappe.whitelist()
-def get_problem(name: str) -> dict[str, Any]:
+def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, Any]:
 	_require_login()
+	if slug:
+		name = frappe.db.get_value("DSAProblem", {"route_slug": slug}, "name")
+	if not name:
+		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
 	return _problem_payload(frappe.get_doc("DSAProblem", name))
 
 

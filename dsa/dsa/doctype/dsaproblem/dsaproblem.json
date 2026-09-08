@@ -4,10 +4,12 @@
  "allow_rename": 1,
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": ["title", "difficulty", "description", "examples", "constraints", "code_section", "custom_starter_code", "custom_wrapper_code", "python_code_section", "custom_python_starter_code", "custom_python_wrapper_code", "javascript_code_section", "custom_javascript_starter_code", "custom_javascript_wrapper_code", "java_code_section", "custom_java_starter_code", "custom_java_wrapper_code", "test_cases"],
+ "field_order": ["title", "route_slug", "difficulty", "topics", "description", "examples", "constraints", "code_section", "custom_starter_code", "custom_wrapper_code", "python_code_section", "custom_python_starter_code", "custom_python_wrapper_code", "javascript_code_section", "custom_javascript_starter_code", "custom_javascript_wrapper_code", "java_code_section", "custom_java_starter_code", "custom_java_wrapper_code", "test_cases"],
  "fields": [
   {"fieldname": "title", "fieldtype": "Data", "in_list_view": 1, "label": "Title", "reqd": 1},
+  {"fieldname": "route_slug", "fieldtype": "Data", "label": "Route Slug", "unique": 1, "read_only": 1, "no_copy": 1},
   {"fieldname": "difficulty", "fieldtype": "Select", "in_list_view": 1, "label": "Difficulty", "options": "easy\nmedium\nhard", "reqd": 1},
+  {"fieldname": "topics", "fieldtype": "Table MultiSelect", "label": "Topics", "options": "DSA Problem Topic"},
   {"fieldname": "description", "fieldtype": "Text Editor", "label": "Description", "reqd": 1},
   {"fieldname": "examples", "fieldtype": "Text Editor", "label": "Examples"},
   {"fieldname": "constraints", "fieldtype": "Text Editor", "label": "Constraints"},

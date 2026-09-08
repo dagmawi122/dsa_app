@@ -1,9 +1,14 @@
 <template>
-    <div v-if="loading" class="dsa-state">{{ __("Loading problems…") }}</div>
-
-    <div v-else-if="!problem" class="dsa-state">{{ __("No problems have been published yet.") }}</div>
-
-    <div v-else ref="practiceShell" class="dsa-practice-shell" :class="{ 'is-resizing': resizing }">
+    <div class="dsa-practice-view" :class="{ 'is-standalone': !props.contestMode }">
+    <header v-if="!props.contestMode" class="dsa-practice-navigation">
+        <a href="/app/list-problems" class="dsa-back-button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m10 6-6 6 6 6M4 12h16"/></svg>{{ __("Problem list") }}</a>
+        <div class="dsa-nav-title"><span>{{ __("DSA Practice") }}</span><span aria-hidden="true">/</span><strong>{{ problem?.title || __("Loading problem…") }}</strong></div>
+        <span class="dsa-nav-mark" aria-hidden="true">&lt;/&gt;</span>
+    </header>
+    <div v-if="loading" class="dsa-state">{{ __("Loading problem…") }}</div>
+    <div v-else class="dsa-practice-content">
+    <p v-if="!problem" role="alert">{{ __("Problem not found or could not be loaded.") }}</p>
+    <div v-if="problem" ref="practiceShell" class="dsa-practice-shell" :class="{ 'is-resizing': resizing }">
         <div class="dsa-panels" :style="panelStyle">
             <div class="dsa-pane dsa-problem-pane">
                 <nav class="dsa-tabbar" :aria-label="__('Problem navigation')">
@@ -31,7 +36,15 @@
 
                     <div class="dsa-meta">
                         <span class="dsa-difficulty">{{ problem.difficulty }}</span>
-                        <span class="dsa-chip">◇ {{ __("Topics") }}</span>
+                        <details class="dsa-problem-topics">
+                            <summary class="dsa-chip">◇ {{ __("Topics") }}</summary>
+                            <div class="dsa-topic-links">
+                                <a v-for="topic in problem.topics" :key="topic" class="dsa-chip dsa-topic-link"
+                                    :href="'/app/list-problems?topic=' + encodeURIComponent(topic)"
+                                    :aria-label="__('Find problems about') + ' ' + topic">{{ topic }}</a>
+                                <span v-if="!problem.topics?.length" class="dsa-muted">{{ __("No topics assigned") }}</span>
+                            </div>
+                        </details>
                         <span class="dsa-chip">♧ {{ __("Hint") }}</span>
                     </div>
 
@@ -402,6 +415,8 @@
             </div>
         </div>
     </div>
+    </div>
+    </div>
 </template>
 
 <script setup>
@@ -410,6 +425,7 @@ import MonacoEditor from "./MonacoEditor.vue";
 
 const elapsedTime = ref(0);
 let timerInterval = null;
+let disposed = false;
 
 const __ = (text) => text;
 
@@ -423,6 +439,10 @@ const props = defineProps({
         default: false,
     },
     contestName: {
+        type: String,
+        default: "",
+    },
+    problemSlug: {
         type: String,
         default: "",
     },
@@ -804,18 +824,19 @@ function wait(milliseconds) {
     );
 }
 
-async function loadProblem(name) {
-    if (!name) return;
+async function loadProblem(name, slug = null) {
+    if (!name && !slug) return;
 
     expandedSubmission.value = null;
     generation += 1;
 
-    problem.value = await call(
+    const loadedProblem = await call(
         "dsa.api.get_problem",
-        {
-            name,
-        }
+        { name, slug }
     );
+    if (disposed) return;
+    problem.value = loadedProblem;
+    updatePageTitle();
 
     selectedLanguageId.value = 54;
     previousLanguageId = 54;
@@ -876,27 +897,7 @@ onMounted(async () => {
             return;
         }
 
-        const problems = await call(
-            "dsa.api.get_problems"
-        );
-
-        if (!problems.length) return;
-
-        const selector = props.page.add_field({
-            fieldname: "dsa_problem",
-            label: __("Problem"),
-            fieldtype: "Select",
-            options: problems.map((item) => ({
-                label: `${item.title} · ${item.difficulty}`,
-                value: item.name,
-            })),
-            change: () =>
-                loadProblem(selector.get_value()),
-        });
-
-        selector.set_value(problems[0].name);
-
-        await loadProblem(problems[0].name);
+        await loadProblem(null, props.problemSlug);
     } catch (error) {
         showError(error);
     } finally {
@@ -1102,9 +1103,15 @@ function showError(error) {
 }
 
 function refresh() {
+    updatePageTitle();
     monacoEditor.value?.layout();
 }
 
+function updatePageTitle() {
+    if (!props.contestMode && problem.value && frappe.get_route()[0] === "dsa-practice") {
+        props.page.set_title(`${__("DSA Practice")} / ${problem.value.title}`);
+    }
+}
 
 async function setContestProblem(contest, newProblemName) {
     if (!newProblemName) return;
@@ -1128,12 +1135,33 @@ defineExpose({
 });
 
 onBeforeUnmount(() => {
+    disposed = true;
+    generation += 1;
     stopResize();
     clearInterval(timerInterval);
 });
 </script>
 
 <style scoped>
+.dsa-practice-view { color: var(--text-color); background: var(--bg-color); }
+.dsa-practice-view.is-standalone { height: 100dvh; display: flex; flex-direction: column; padding: 0 10px 10px; }
+.dsa-practice-content { min-height: 0; flex: 1; }
+.is-standalone .dsa-practice-shell { height: 100%; min-height: 0; }
+.dsa-practice-navigation { display: flex; align-items: center; gap: 20px; min-height: 58px; flex-shrink: 0; padding: 8px 4px; }
+.dsa-back-button { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--card-bg); color: var(--text-color); font-size: 12px; font-weight: 550; text-decoration: none; white-space: nowrap; }
+.dsa-back-button svg { width: 15px; height: 15px; }
+.dsa-back-button:hover { background: var(--fg-hover-color); color: var(--text-color); }
+.dsa-back-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.dsa-nav-title { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--text-muted); }
+.dsa-nav-title strong { color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.dsa-nav-mark { margin-left: auto; color: var(--text-muted); font-size: 18px; }
+.dsa-problem-topics { min-width: 0; }
+.dsa-problem-topics summary { cursor: pointer; }
+.dsa-topic-links { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; max-width: min(360px, 60vw); }
+.dsa-topic-links .dsa-topic-link { background: var(--bg-blue); color: var(--text-on-blue); text-decoration: none; line-height: 1.4; }
+.dsa-topic-links .dsa-topic-link:hover { text-decoration: underline; }
+.dsa-problem-topics summary:focus-visible, .dsa-topic-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
 .dsa-state {
     min-height: 600px;
     display: grid;
@@ -1145,24 +1173,24 @@ onBeforeUnmount(() => {
     height: calc(100vh - 118px);
     min-height: 650px;
     overflow: hidden;
-    background: #191919;
-    color: #f2f2f2;
+    background: var(--bg-color);
+    color: var(--text-color);
 }
 
 .dsa-panels {
     display: grid;
     height: 100%;
     grid-template-columns: minmax(0, var(--left-panel-width)) 10px minmax(0, 1fr);
-    background: #111;
+    background: var(--bg-color);
 }
 
 .dsa-pane {
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    background: #242424;
+    background: var(--card-bg);
 }
 
 .dsa-problem-pane {
@@ -1174,7 +1202,7 @@ onBeforeUnmount(() => {
 .dsa-panel-title,
 .dsa-editor-toolbar,
 .dsa-terminal-header {
-    background: #333;
+    background: var(--control-bg);
 }
 
 .dsa-tabbar {
@@ -1183,7 +1211,7 @@ onBeforeUnmount(() => {
     flex: 0 0 45px;
     align-items: stretch;
     overflow-x: auto;
-    border-bottom: 1px solid #383838;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .dsa-tab {
@@ -1194,7 +1222,7 @@ onBeforeUnmount(() => {
     padding: 0 12px;
     border: 0;
     background: transparent;
-    color: #a9a9a9;
+    color: var(--text-muted);
     font-size: 13px;
     white-space: nowrap;
 }
@@ -1204,12 +1232,12 @@ onBeforeUnmount(() => {
     left: 0;
     width: 1px;
     height: 18px;
-    background: #555;
+    background: var(--fg-hover-color);
     content: "";
 }
 
 .dsa-tab.is-active {
-    color: #f4f4f4;
+    color: var(--text-color);
 }
 
 .dsa-tab-icon {
@@ -1218,16 +1246,16 @@ onBeforeUnmount(() => {
 }
 
 .blue {
-    color: #168fff;
+    color: var(--text-on-blue);
 }
 
 .amber {
-    color: #d9a52b;
+    color: var(--text-on-orange);
 }
 
 .green,
 .dsa-code-icon {
-    color: #21b657;
+    color: var(--text-on-green);
 }
 
 .dsa-statement {
@@ -1240,7 +1268,7 @@ onBeforeUnmount(() => {
 
 .dsa-statement h1 {
     margin: 0;
-    color: #f5f5f5;
+    color: var(--text-color);
     font-size: 22px;
     font-weight: 650;
 }
@@ -1248,7 +1276,7 @@ onBeforeUnmount(() => {
 .dsa-meta {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
     margin-top: 14px;
 }
@@ -1259,20 +1287,20 @@ onBeforeUnmount(() => {
     align-items: center;
     padding: 4px 8px;
     border-radius: 12px;
-    background: #353535;
-    color: #d1d1d1;
+    background: var(--control-bg);
+    color: var(--text-color);
     font-size: 11px;
     line-height: 1;
 }
 
 .dsa-difficulty {
     background: rgba(31, 169, 113, 0.15);
-    color: #47b995;
+    color: var(--text-on-green);
     text-transform: capitalize;
 }
 
 .dsa-chip.amber {
-    color: #e3b342;
+    color: var(--text-on-orange);
 }
 
 .dsa-statement section {
@@ -1281,32 +1309,32 @@ onBeforeUnmount(() => {
 
 .dsa-statement h3 {
     margin: 0 0 12px;
-    color: #f1f1f1;
+    color: var(--text-color);
     font-size: 14px;
     font-weight: 650;
 }
 
 .dsa-rich-text {
-    color: #dedede;
+    color: var(--text-color);
     font-size: 13px;
     line-height: 1.65;
 }
 
 .dsa-rich-text :deep(pre) {
     padding: 12px 14px;
-    border-left: 2px solid #454545;
+    border-left: 2px solid var(--border-color);
     border-radius: 0;
     background: transparent;
-    color: #d8d8d8;
+    color: var(--text-color);
     white-space: pre-wrap;
 }
 
 .dsa-rich-text :deep(code) {
     padding: 2px 5px;
-    border: 1px solid #505050;
+    border: 1px solid var(--border-color);
     border-radius: 5px;
-    background: #3a3a3a;
-    color: #d2d2d2;
+    background: var(--control-bg);
+    color: var(--text-color);
 }
 
 .dsa-tab-content {
@@ -1320,13 +1348,13 @@ onBeforeUnmount(() => {
     display: grid;
     min-height: 180px;
     place-items: center;
-    color: #777;
+    color: var(--text-muted);
     text-align: center;
 }
 
 .dsa-tab-empty h2 {
     margin: 0 0 8px;
-    color: #ddd;
+    color: var(--text-color);
     font-size: 18px;
 }
 
@@ -1343,16 +1371,16 @@ onBeforeUnmount(() => {
 
 .dsa-content-heading h2 {
     margin: 0;
-    color: #eee;
+    color: var(--text-color);
     font-size: 18px;
 }
 
 .dsa-content-heading button {
     padding: 5px 9px;
-    border: 1px solid #505050;
+    border: 1px solid var(--border-color);
     border-radius: 5px;
-    background: #363636;
-    color: #ccc;
+    background: var(--control-bg);
+    color: var(--text-color);
     font-size: 11px;
 }
 
@@ -1363,9 +1391,9 @@ onBeforeUnmount(() => {
 .dsa-submission-card {
     margin-bottom: 10px;
     overflow: hidden;
-    border: 1px solid #414141;
+    border: 1px solid var(--border-color);
     border-radius: 7px;
-    background: #292929;
+    background: var(--card-bg);
 }
 
 .dsa-submission-card > div {
@@ -1373,7 +1401,7 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 12px;
     padding: 11px 12px;
-    color: #999;
+    color: var(--text-muted);
     font-size: 11px;
 }
 
@@ -1386,11 +1414,11 @@ onBeforeUnmount(() => {
 }
 
 .dsa-submission-actions button {
-    border: 1px solid #555;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 5px 8px;
-    background: #333;
-    color: #eee;
+    background: var(--control-bg);
+    color: var(--text-color);
     cursor: pointer;
 }
 
@@ -1413,28 +1441,28 @@ onBeforeUnmount(() => {
 }
 
 .submission-status.accepted {
-    color: #42b883;
+    color: var(--text-on-green);
 }
 
 .submission-status.wrong-answer {
-    color: #e45757;
+    color: var(--text-on-red);
 }
 
 .submission-status.runtime-error {
-    color: #e08b45;
+    color: var(--text-on-orange);
 }
 
 .submission-status.compilation-error {
-    color: #d56be0;
+    color: var(--text-on-purple);
 }
 
 .submission-status.running,
 .submission-status.queued {
-    color: #d9a52b;
+    color: var(--text-on-orange);
 }
 
 .submission-score {
-    color: #e3b342;
+    color: var(--text-on-orange);
     font-weight: 600;
 }
 
@@ -1447,10 +1475,10 @@ onBeforeUnmount(() => {
     margin: 0;
     overflow: auto;
     padding: 14px;
-    border-top: 1px solid #414141;
+    border-top: 1px solid var(--border-color);
     border-radius: 0;
-    background: #202020;
-    color: #ddd;
+    background: var(--control-bg);
+    color: var(--text-color);
     font-size: 12px;
 }
 
@@ -1467,7 +1495,7 @@ onBeforeUnmount(() => {
 .dsa-resizer::before {
     width: 2px;
     height: 100%;
-    background: #303030;
+    background: var(--control-bg);
     content: "";
     transition: background 0.15s;
 }
@@ -1477,7 +1505,7 @@ onBeforeUnmount(() => {
     width: 3px;
     height: 42px;
     border-radius: 2px;
-    background: #5a5a5a;
+    background: var(--fg-hover-color);
     opacity: 0;
     transition: opacity 0.15s;
 }
@@ -1500,16 +1528,16 @@ onBeforeUnmount(() => {
     gap: 10px;
     border: 0;
     border-radius: 0;
-    background: #111;
+    background: var(--bg-color);
 }
 
 .dsa-code-panel,
 .dsa-terminal {
     min-height: 0;
     overflow: hidden;
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    background: #242424;
+    background: var(--card-bg);
 }
 
 .dsa-code-panel {
@@ -1553,10 +1581,10 @@ onBeforeUnmount(() => {
     justify-content: center;
     margin-left: 4px;
     padding: 0 9px;
-    border: 1px solid #4a4a4a;
+    border: 1px solid var(--border-color);
     border-radius: 5px;
-    background: #292929;
-    color: #e8e8e8;
+    background: var(--card-bg);
+    color: var(--text-color);
     font-family: var(--font-stack-monospace);
     font-size: 11px;
     font-weight: 600;
@@ -1570,7 +1598,7 @@ onBeforeUnmount(() => {
     padding: 0 10px;
     border: 0;
     border-radius: 5px;
-    color: #eee;
+    color: var(--text-color);
     font-size: 11px;
     font-weight: 600;
 }
@@ -1585,14 +1613,15 @@ onBeforeUnmount(() => {
 }
 
 .dsa-run {
-    background: #4a4a4a;
+    background: var(--fg-hover-color);
 }
 
 .dsa-run:hover:not(:disabled) {
-    background: #575757;
+    background: var(--fg-hover-color);
 }
 
 .dsa-submit {
+    color: #fff;
     background: #1e8e4d;
 }
 
@@ -1607,9 +1636,9 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 18px;
     padding: 0 12px;
-    border-top: 1px solid #383838;
-    border-bottom: 1px solid #444;
-    color: #bbb;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
     font-size: 12px;
 }
 
@@ -1626,7 +1655,7 @@ onBeforeUnmount(() => {
     outline: none;
     appearance: none;
     background: transparent;
-    color: #c7c7c7;
+    color: var(--text-color);
     font: inherit;
     cursor: pointer;
 }
@@ -1637,8 +1666,8 @@ onBeforeUnmount(() => {
 }
 
 .dsa-language-select select option {
-    background: #333;
-    color: #eee;
+    background: var(--control-bg);
+    color: var(--text-color);
 }
 
 .dsa-language-select .dsa-chevron {
@@ -1657,11 +1686,11 @@ onBeforeUnmount(() => {
 }
 
 .dsa-chevron {
-    color: #888;
+    color: var(--text-muted);
 }
 
 .dsa-lock {
-    color: #aaa;
+    color: var(--text-muted);
     font-size: 8px;
 }
 
@@ -1678,12 +1707,12 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: space-between;
     padding: 0 12px;
-    color: #777;
+    color: var(--text-muted);
     font-size: 10px;
 }
 
 .dsa-terminal {
-    color: #e5e5e5;
+    color: var(--text-color);
 }
 
 .dsa-terminal-header {
@@ -1692,7 +1721,7 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: space-between;
     padding: 0 12px;
-    border-bottom: 1px solid #383838;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .dsa-result-tabs {
@@ -1709,7 +1738,7 @@ onBeforeUnmount(() => {
     padding: 0;
     border: 0;
     background: transparent;
-    color: #aaa;
+    color: var(--text-muted);
     font-size: 12px;
 }
 
@@ -1722,23 +1751,23 @@ onBeforeUnmount(() => {
     left: -10px;
     width: 1px;
     height: 18px;
-    background: #555;
+    background: var(--fg-hover-color);
     content: "";
 }
 
 .dsa-result-tabs .is-active {
-    color: #eee;
+    color: var(--text-color);
 }
 
 .dsa-terminal-header button {
     border: 0;
     background: transparent;
-    color: #999;
+    color: var(--text-muted);
     font-size: 11px;
 }
 
 .dsa-terminal-header button:hover {
-    color: #fff;
+    color: var(--text-color);
 }
 
 .dsa-terminal-output {
@@ -1753,7 +1782,7 @@ onBeforeUnmount(() => {
 .dsa-terminal-output pre {
     margin: 0;
     background: transparent;
-    color: #ddd;
+    color: var(--text-color);
     white-space: pre-wrap;
 }
 
@@ -1762,7 +1791,7 @@ onBeforeUnmount(() => {
     inset: 0;
     display: grid;
     place-items: center;
-    color: #626262;
+    color: var(--text-muted);
     font-family: var(--font-stack);
 }
 
@@ -1774,7 +1803,7 @@ onBeforeUnmount(() => {
 }
 
 .dsa-testcase-input label {
-    color: #bbb;
+    color: var(--text-color);
     font-family: var(--font-stack);
     font-size: 11px;
     font-weight: 600;
@@ -1783,11 +1812,11 @@ onBeforeUnmount(() => {
 .dsa-testcase-input textarea {
     min-height: 105px;
     resize: vertical;
-    border: 1px solid #444;
+    border: 1px solid var(--border-color);
     border-radius: 7px;
     outline: none;
-    background: #383838;
-    color: #f0f0f0;
+    background: var(--control-bg);
+    color: var(--text-color);
     font: inherit;
     padding: 12px;
 }
@@ -1813,24 +1842,24 @@ onBeforeUnmount(() => {
     border: 0;
     border-radius: 7px;
     background: transparent;
-    color: #aaa;
+    color: var(--text-muted);
     font-family: var(--font-stack);
     font-size: 12px;
 }
 
 .dsa-case-tabs button:hover {
-    background: #303030;
-    color: #ddd;
+    background: var(--control-bg);
+    color: var(--text-color);
 }
 
 .dsa-case-tabs button.is-active {
-    background: #414141;
-    color: #fff;
+    background: var(--fg-hover-color);
+    color: var(--text-color);
 }
 
 .dsa-case-tabs .dsa-add-case {
     padding: 0 11px;
-    color: #777;
+    color: var(--text-muted);
     font-size: 20px;
 }
 
@@ -1846,18 +1875,18 @@ onBeforeUnmount(() => {
 }
 
 .dsa-result-summary strong {
-    color: #e05757;
+    color: var(--text-on-red);
     font-size: 20px;
     font-weight: 500;
 }
 
 .dsa-result-summary strong.accepted {
-    color: #28c76f;
+    color: var(--text-on-green);
 }
 
 .dsa-result-summary strong.running,
 .dsa-result-summary span {
-    color: #999;
+    color: var(--text-muted);
 }
 
 .result-cases {
@@ -1865,12 +1894,12 @@ onBeforeUnmount(() => {
 }
 
 .case-pass {
-    color: #28c76f;
+    color: var(--text-on-green);
     font-size: 9px;
 }
 
 .case-fail {
-    color: #e05757;
+    color: var(--text-on-red);
     font-size: 9px;
 }
 
@@ -1881,7 +1910,7 @@ onBeforeUnmount(() => {
 
 .dsa-result-details label {
     margin-top: 4px;
-    color: #999;
+    color: var(--text-muted);
     font-size: 11px;
 }
 
@@ -1889,19 +1918,24 @@ onBeforeUnmount(() => {
     min-height: 54px;
     padding: 12px;
     border-radius: 7px;
-    background: #383838;
-    color: #eee;
+    background: var(--control-bg);
+    color: var(--text-color);
 }
 
 .dsa-result-details pre.is-error {
-    color: #ff8b8b;
+    color: var(--text-on-red);
 }
 
 .dsa-muted {
-    color: #777;
+    color: var(--text-muted);
 }
 
 @media (max-width: 900px) {
+    .dsa-practice-view.is-standalone { overflow-y: auto; }
+    .is-standalone .dsa-practice-content { flex: none; }
+    .is-standalone .dsa-practice-shell { height: auto; }
+    .dsa-nav-title > span, .dsa-nav-mark { display: none; }
+    .dsa-practice-navigation { gap: 12px; }
     .dsa-practice-shell {
         height: auto;
         min-height: 0;
@@ -1927,9 +1961,9 @@ onBeforeUnmount(() => {
 .contest-progress {
     margin-top: 22px;
     padding: 14px;
-    border: 1px solid #414141;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    background: #292929;
+    background: var(--card-bg);
 }
 
 .contest-progress-header {
@@ -1937,20 +1971,20 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 12px;
-    color: #ddd;
+    color: var(--text-color);
     font-size: 12px;
 }
 
 .contest-progress-header strong {
-    color: #eee;
+    color: var(--text-color);
 }
 
 .contest-progress-header span {
-    color: #999;
+    color: var(--text-muted);
 }
 
 .contest-progress-header b {
-    color: #e3b342;
+    color: var(--text-on-orange);
 }
 
 .contest-progress-stats {
@@ -1965,7 +1999,7 @@ onBeforeUnmount(() => {
     gap: 3px;
     padding: 10px;
     border-radius: 6px;
-    background: #343434;
+    background: var(--control-bg);
 }
 
 .progress-item strong {
@@ -1973,20 +2007,20 @@ onBeforeUnmount(() => {
 }
 
 .progress-item span {
-    color: #888;
+    color: var(--text-muted);
     font-size: 10px;
 }
 
 .progress-item.solved strong {
-    color: #42b883;
+    color: var(--text-on-green);
 }
 
 .progress-item.attempted strong {
-    color: #d9a52b;
+    color: var(--text-on-orange);
 }
 
 .progress-item.unsolved strong {
-    color: #999;
+    color: var(--text-muted);
 }
 
 @media (max-width: 600px) {
@@ -2004,16 +2038,26 @@ onBeforeUnmount(() => {
     }
 }
 
-.submission-status.accepted { color: #28c76f; }
-.submission-status.wrong-answer, .submission-status.failed { color: #e05757; }
-.submission-status.time-limit-exceeded { color: #ff9f43; }
-.submission-status.compilation-error { color: #ea5455; }
-.submission-status.runtime-error { color: #f5365c; }
-.submission-status.running, .submission-status.queued { color: #5e72e4; }
+.submission-status.accepted { color: var(--text-on-green); }
+.submission-status.wrong-answer, .submission-status.failed { color: var(--text-on-red); }
+.submission-status.time-limit-exceeded { color: var(--text-on-orange); }
+.submission-status.compilation-error { color: var(--text-on-red); }
+.submission-status.runtime-error { color: var(--text-on-red); }
+.submission-status.running, .submission-status.queued { color: var(--text-on-blue); }
 
 </style>
 
 <style>
+body.dsa-focus-mode { overflow: hidden; }
+body.dsa-focus-mode .body-sidebar-container,
+body.dsa-focus-mode .main-section > header,
+body.dsa-focus-mode .dsa-editor-page .page-head { display: none !important; }
+body.dsa-focus-mode .dsa-editor-page { position: fixed; inset: 0; z-index: 1030; margin: 0; padding: 0; width: 100%; background: var(--bg-color); }
+body.dsa-focus-mode .dsa-editor-page .page-body,
+body.dsa-focus-mode .dsa-editor-page .layout-main,
+body.dsa-focus-mode .dsa-editor-page .layout-main-section-wrapper,
+body.dsa-focus-mode .dsa-editor-page .layout-main-section { margin: 0; padding: 0; width: 100%; max-width: none; border: 0; }
+.dsa-catalog-page .layout-main-section { border: 0; background: transparent; }
 .dsa-page-container {
     max-width: none !important;
     padding-right: 6px;

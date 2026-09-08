@@ -1,8 +1,18 @@
 import { createApp } from "vue";
 import DSAPractice from "./components/DSAPractice.vue";
+import ProblemList from "./components/ProblemList.vue";
+
+// Scope the distraction-free layout to problem routes; leaving restores Desk.
+function syncPracticeLayout() {
+	const route = frappe.get_route();
+	document.body.classList.toggle("dsa-focus-mode", route[0] === "dsa-practice" && !!route[1]);
+}
+frappe.router.on("change", syncPracticeLayout);
+syncPracticeLayout();
 
 class DSAPracticePage {
 	constructor(wrapper) {
+		wrapper.classList.add("dsa-editor-page");
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
 			title: __("DSA Practice"),
@@ -14,20 +24,48 @@ class DSAPracticePage {
 		this.mountPoint = document.createElement("div");
 		this.page.main[0].appendChild(this.mountPoint);
 
-		this.app = createApp(DSAPractice, {
-			page: this.page,
-		});
-
-		this.component = this.app.mount(this.mountPoint);
+		this.refresh();
 	}
 
 	refresh() {
+		const slug = frappe.get_route()[1];
+		if (!slug) {
+			frappe.set_route("list-problems");
+			return;
+		}
+		if (slug !== this.problemSlug) {
+			this.dispose();
+			this.problemSlug = slug;
+			this.page.set_title(__("DSA Practice"));
+			this.app = createApp(DSAPractice, { page: this.page, problemSlug: slug });
+			this.component = this.app.mount(this.mountPoint);
+			return;
+		}
 		this.component?.refresh?.();
 	}
 
 	dispose() {
 		this.app?.unmount();
 		this.app = null;
+	}
+}
+
+class ProblemListPage {
+	constructor(wrapper) {
+		wrapper.classList.add("dsa-catalog-page");
+		this.page = frappe.ui.make_app_page({
+			parent: wrapper,
+			title: __("Practice Problems"),
+			single_column: true,
+		});
+		this.mountPoint = document.createElement("div");
+		this.page.main[0].appendChild(this.mountPoint);
+		this.app = createApp(ProblemList);
+		this.component = this.app.mount(this.mountPoint);
+	}
+
+	refresh() {
+		this.component?.refresh?.();
 	}
 }
 
@@ -73,6 +111,7 @@ class ContestProblemPage {
 		}
 	}
 
+
 	dispose() {
 		this.app?.unmount();
 		this.app = null;
@@ -80,6 +119,7 @@ class ContestProblemPage {
 }
 
 window.dsa = {
+	ProblemList: ProblemListPage,
 	DSAPractice: DSAPracticePage,
 	ContestProblem: ContestProblemPage,
 };
