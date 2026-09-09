@@ -1518,11 +1518,11 @@ onBeforeUnmount(() => {
 .dsa-rich-text :deep(em),
 .dsa-rich-text :deep(b),
 .dsa-rich-text :deep(i) {
-    color: #ffffff;
+    color: var(--text-color);
 }
 
 .dsa-rich-text :deep(a) {
-    color: #6ea8fe;
+    color: var(--text-on-blue, #6ea8fe);
 }
 
 .dsa-rich-text :deep(h1),
@@ -1531,7 +1531,7 @@ onBeforeUnmount(() => {
 .dsa-rich-text :deep(h4),
 .dsa-rich-text :deep(h5),
 .dsa-rich-text :deep(h6) {
-    color: #ffffff;
+    color: var(--text-color);
 }
 
 .dsa-rich-text :deep(pre) {
