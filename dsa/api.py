@@ -285,7 +285,13 @@ def get_submissions(problem: str) -> list[dict[str, Any]]:
 			"code",
 			"language_id",
 			"creation",
-            "runtime",
+			"runtime",
+			# NOTE: these were missing before, so the complexity badges never
+			# showed up for previously-saved submissions (only for a live run).
+			"time_complexity",
+			"space_complexity",
+			"complexity_result",
+			"space_complexity_result",
 		],
 		order_by="creation desc",
 		limit_page_length=50,
@@ -1100,10 +1106,10 @@ def get_contest_submissions(
 
 			submission.status = result["status"]
 			submission.score = result["score"]
-			submission.passed_count = result["passed_count"]
-			submission.total_count = result["total_count"]
 
-	# Add passed/total counts from linked DSA submissions.
+	# Add passed/total counts and the complexity/runtime fields from the
+	# linked DSA submission. These were previously left off entirely, so
+	# contest submission cards never showed runtime or complexity results.
 	for submission in submissions:
 		if not hasattr(submission, "passed_count"):
 			submission.passed_count = 0
@@ -1111,17 +1117,36 @@ def get_contest_submissions(
 		if not hasattr(submission, "total_count"):
 			submission.total_count = 0
 
+		submission.time_complexity = None
+		submission.space_complexity = None
+		submission.complexity_result = None
+		submission.space_complexity_result = None
+		submission.runtime = 0
+
 		if submission.dsa_submission:
 			dsa_data = frappe.db.get_value(
 				"DSA Submission",
 				submission.dsa_submission,
-				["passed_count", "total_count"],
+				[
+					"passed_count",
+					"total_count",
+					"time_complexity",
+					"space_complexity",
+					"complexity_result",
+					"space_complexity_result",
+					"runtime",
+				],
 				as_dict=True,
 			)
 
 			if dsa_data:
 				submission.passed_count = cint(dsa_data.passed_count or 0)
 				submission.total_count = cint(dsa_data.total_count or 0)
+				submission.time_complexity = dsa_data.time_complexity
+				submission.space_complexity = dsa_data.space_complexity
+				submission.complexity_result = dsa_data.complexity_result
+				submission.space_complexity_result = dsa_data.space_complexity_result
+				submission.runtime = dsa_data.runtime or 0
 
 	return submissions
 

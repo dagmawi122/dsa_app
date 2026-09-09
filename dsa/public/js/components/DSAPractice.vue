@@ -190,6 +190,54 @@
 
 									<time>{{ formatSubmissionTime(submission) }}</time>
 								</div>
+
+								<div
+									v-if="hasStats(submission)"
+									class="dsa-submission-stats"
+								>
+									<span v-if="submission.runtime" class="stat-chip">
+										<span class="stat-icon" aria-hidden="true">◷</span>
+										<span class="stat-label">{{ __("Runtime") }}</span>
+										<span class="stat-value">{{
+											formatRuntime(submission.runtime)
+										}}</span>
+									</span>
+
+									<span v-if="submission.time_complexity" class="stat-chip">
+										<span class="stat-icon" aria-hidden="true">Σ</span>
+										<span class="stat-label">{{ __("Time") }}</span>
+										<span class="stat-value">{{
+											submission.time_complexity
+										}}</span>
+										<span
+											class="complexity-result"
+											:class="complexityResultClass(submission.complexity_result)"
+										>
+											<span class="complexity-result-icon" aria-hidden="true">{{
+												complexityResultIcon(submission.complexity_result)
+											}}</span>
+											{{ complexityResultLabel(submission.complexity_result) }}
+										</span>
+									</span>
+
+									<span v-if="submission.space_complexity" class="stat-chip">
+										<span class="stat-icon" aria-hidden="true">▭</span>
+										<span class="stat-label">{{ __("Space") }}</span>
+										<span class="stat-value">{{
+											submission.space_complexity
+										}}</span>
+										<span
+											class="complexity-result"
+											:class="complexityResultClass(submission.space_complexity_result)"
+										>
+											<span class="complexity-result-icon" aria-hidden="true">{{
+												complexityResultIcon(submission.space_complexity_result)
+											}}</span>
+											{{ complexityResultLabel(submission.space_complexity_result) }}
+										</span>
+									</span>
+								</div>
+
 								<div class="dsa-submission-actions">
 									<span>{{ submissionLanguage(submission) }}</span>
 									<button
@@ -252,7 +300,16 @@
 										:disabled="busy"
 										@click="runCode"
 									>
-										<span class="lucide-play"></span>
+										<svg
+											v-if="!busy"
+											class="dsa-button-icon"
+											viewBox="0 0 24 24"
+											fill="currentColor"
+											aria-hidden="true"
+										>
+											<path d="M7 4.5v15l13-7.5-13-7.5z" />
+										</svg>
+										<span v-else class="dsa-button-spinner" aria-hidden="true"></span>
 										{{ __("Run") }}
 									</button>
 
@@ -262,7 +319,20 @@
 										:disabled="busy"
 										@click="submitCode"
 									>
-										<span class="lucide-check"></span>
+										<svg
+											v-if="!busy"
+											class="dsa-button-icon"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2.5"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<polyline points="20 6 9 17 4 12" />
+										</svg>
+										<span v-else class="dsa-button-spinner" aria-hidden="true"></span>
 										{{ __("Submit") }}
 									</button>
 
@@ -398,6 +468,43 @@
 											<span v-if="resultRuntime">
 												{{ __("Runtime") }}: {{ resultRuntime }}
 											</span>
+										</div>
+
+										<div
+											v-if="resultComplexity || resultSpaceComplexity"
+											class="dsa-complexity-info"
+										>
+											<div class="dsa-complexity-row">
+												<label>{{ __("Time Complexity") }}</label>
+												<span>
+													{{ resultComplexity || __("Unknown") }}
+													<span
+														class="complexity-result"
+														:class="complexityResultClass(complexityResult)"
+													>
+														<span class="complexity-result-icon" aria-hidden="true">{{
+															complexityResultIcon(complexityResult)
+														}}</span>
+														{{ complexityResultLabel(complexityResult) }}
+													</span>
+												</span>
+											</div>
+
+											<div class="dsa-complexity-row">
+												<label>{{ __("Space Complexity") }}</label>
+												<span>
+													{{ resultSpaceComplexity || __("Unknown") }}
+													<span
+														class="complexity-result"
+														:class="complexityResultClass(spaceComplexityResult)"
+													>
+														<span class="complexity-result-icon" aria-hidden="true">{{
+															complexityResultIcon(spaceComplexityResult)
+														}}</span>
+														{{ complexityResultLabel(spaceComplexityResult) }}
+													</span>
+												</span>
+											</div>
 										</div>
 
 										<div class="dsa-case-tabs result-cases">
@@ -569,6 +676,7 @@ const leftPanelWidth = ref(50);
 const resizing = ref(false);
 const contestProgress = ref(null);
 const contestProgressLoading = ref(false);
+const submissionMade = ref(false);
 
 let generation = 0;
 let nextTestCaseKey = 2;
@@ -599,6 +707,36 @@ function formatTime(seconds) {
 
 	return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
+
+// Formats a raw runtime value (seconds, as returned by Judge0 — e.g. "0.03")
+// into a short human-readable string: sub-second runtimes are shown in
+// milliseconds, anything at or above 1s is shown in seconds.
+function formatRuntime(runtime) {
+	const seconds = Number(runtime);
+
+	if (!Number.isFinite(seconds) || seconds < 0) {
+		return null;
+	}
+
+	if (seconds === 0) {
+		return "0 ms";
+	}
+
+	if (seconds < 1) {
+		return `${Math.round(seconds * 1000)} ms`;
+	}
+
+	return `${seconds.toFixed(2)} s`;
+}
+
+// Whether a submission has any of the 5 result fields worth rendering as a
+// stats row (runtime, time complexity, space complexity).
+function hasStats(submission) {
+	return Boolean(
+		submission?.runtime || submission?.time_complexity || submission?.space_complexity
+	);
+}
+
 function displayStatus(status) {
 	const normalized = String(status || "").toLowerCase();
 
@@ -611,6 +749,7 @@ function displayStatus(status) {
 		failed: __("Wrong Answer"),
 		running: __("Running"),
 		queued: __("Queued"),
+		rejected: __("Rejected"),
 	};
 
 	return statusMap[normalized] || status || __("Unknown");
@@ -641,7 +780,54 @@ function statusIcon(status) {
 		return "!";
 	}
 
+	if (normalized === "rejected") {
+		return "⚠";
+	}
+
 	return "✕";
+}
+
+// Maps a raw complexity_result / space_complexity_result value ("Optimal",
+// "Too Complex", or missing) to the CSS class used for the pill next to the
+// Big-O readout (.optimal / .too-complex / .unknown, defined in <style>).
+function complexityResultClass(result) {
+	const normalized = String(result || "").toLowerCase();
+
+	if (normalized === "optimal") {
+		return "optimal";
+	}
+
+	if (normalized === "too complex") {
+		return "too-complex";
+	}
+
+	return "unknown";
+}
+
+function complexityResultLabel(result) {
+	return result || __("Unknown");
+}
+
+// Small glyph shown beside the Optimal / Too Complex / Unknown pill —
+// a checkmark for a pass, a warning triangle for a complexity rejection.
+function complexityResultIcon(result) {
+	const normalized = String(result || "").toLowerCase();
+
+	if (normalized === "optimal") {
+		return "✓";
+	}
+
+	if (normalized === "too complex") {
+		return "⚠";
+	}
+
+	return "";
+}
+
+// A run/submission is Rejected — regardless of whether the tests themselves
+// passed — if either the time or space complexity came back "Too Complex".
+function isComplexityRejected(...results) {
+	return results.some((result) => result === "Too Complex");
 }
 
 function formatSubmissionTime(submission) {
@@ -862,11 +1048,6 @@ async function call(method, args = {}, type = "GET") {
 		type,
 	});
 
-    if (method === "dsa.api.run_code") {
-        console.log("FULL FRAPPE RESPONSE:", response);
-        console.log("MESSAGE:", response.message);
-    }
-
     return response.message;
 }
 
@@ -1004,34 +1185,28 @@ async function runCode() {
 			});
 
 			if (!result.pending) {
-				const complexityRejected =
-					queued.complexity_result === "Too Complex" ||
-					queued.space_complexity_result === "Too Complex";
+				resultComplexity.value = queued.complexity || "";
+				resultSpaceComplexity.value = queued.space_complexity || "";
+				complexityResult.value = queued.complexity_result || "";
+				spaceComplexityResult.value = queued.space_complexity_result || "";
+
+				const complexityRejected = isComplexityRejected(
+					complexityResult.value,
+					spaceComplexityResult.value
+				);
 
 				overallStatus.value = complexityRejected
 					? "Rejected"
 					: result.status || __("Finished");
 
 				resultRuntime.value = result.time
-					? `${result.time} s`
+					? formatRuntime(result.time)
 					: "";
-
-				resultComplexity.value =
-					queued.complexity || "";
-
-				resultSpaceComplexity.value =
-					queued.space_complexity || "";
-
-				complexityResult.value =
-					queued.complexity_result || "";
-
-				spaceComplexityResult.value =
-					queued.space_complexity_result || "";
 
 				testResults.value = [
 					{
 						index: activeTestCaseIndex.value + 1,
-						status: result.status,
+						status: complexityRejected ? "Rejected" : result.status,
 						input,
 						expected_output: result.expected_output,
 						actual_output: result.stdout,
@@ -1136,20 +1311,37 @@ async function submitCode() {
                 queued.space_complexity_result ||
                 "";
 
-            overallStatus.value =
-                result.display_status ||
-                result.status ||
-                __("Finished");
+            // A submission is Rejected the moment either complexity metric
+            // comes back "Too Complex" — this overrides the raw judge
+            // status (which may otherwise say "Accepted" purely on
+            // correctness) the same way runCode() already does for a
+            // single test run.
+            const complexityRejected = isComplexityRejected(
+                complexityResult.value,
+                spaceComplexityResult.value
+            );
 
-            testResults.value = result.results || [];
+            overallStatus.value = complexityRejected
+                ? "Rejected"
+                : result.display_status || result.status || __("Finished");
+
+            resultRuntime.value = result.runtime
+                ? formatRuntime(result.runtime)
+                : resultRuntime.value;
+
+            testResults.value = (result.results || []).map((testResult) =>
+                complexityRejected
+                    ? { ...testResult, status: "Rejected" }
+                    : testResult
+            );
 
             if (!result.pending) {
             await loadSubmissions();
 
             if (props.contestMode) {
                 const accepted =
-                    result.status === "Accepted" ||
-                    result.status_id === 3;
+                    !complexityRejected &&
+                    (result.status === "Accepted" || result.status_id === 3);
 
                 if (accepted) {
                     submissionMade.value = true;
@@ -1675,6 +1867,10 @@ onBeforeUnmount(() => {
 	color: var(--text-on-orange);
 }
 
+.submission-status.rejected {
+	color: var(--text-on-red);
+}
+
 .submission-score {
 	color: var(--text-on-orange);
 	font-weight: 600;
@@ -1682,6 +1878,47 @@ onBeforeUnmount(() => {
 
 .dsa-submission-card time {
 	margin-left: auto;
+}
+
+/* Row of stat chips (Runtime / Time Complexity / Space Complexity) shown
+   below the main status row on each submission card. Sits in its own flex
+   row so it can wrap independently and doesn't fight the status line for
+   space. */
+.dsa-submission-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 0 12px 11px;
+}
+
+.stat-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	border: 1px solid var(--border-color);
+	border-radius: 999px;
+	background: var(--control-bg);
+	color: var(--text-muted);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.stat-icon {
+	font-size: 11px;
+	line-height: 1;
+	opacity: 0.85;
+}
+
+.stat-label {
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.stat-value {
+	color: var(--text-color);
+	font-family: var(--font-stack-monospace);
+	font-weight: 600;
 }
 
 .dsa-submission-card pre {
@@ -1806,41 +2043,93 @@ onBeforeUnmount(() => {
 
 .dsa-button {
 	display: inline-flex;
-	height: 28px;
+	height: 30px;
 	align-items: center;
-	gap: 5px;
-	padding: 0 10px;
-	border: 0;
-	border-radius: 5px;
+	gap: 6px;
+	padding: 0 13px;
+	border: 1px solid transparent;
+	border-radius: 6px;
 	color: var(--text-color);
-	font-size: 11px;
+	font-size: 12px;
 	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background-color 0.15s ease,
+		border-color 0.15s ease,
+		color 0.15s ease,
+		box-shadow 0.15s ease,
+		transform 0.05s ease;
 }
 
-.dsa-button span {
+.dsa-button-icon {
 	width: 13px;
 	height: 13px;
+	flex-shrink: 0;
+}
+
+.dsa-button-spinner {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+	border: 2px solid currentColor;
+	border-radius: 50%;
+	border-top-color: transparent;
+	opacity: 0.75;
+	animation: dsa-button-spin 0.7s linear infinite;
+}
+
+@keyframes dsa-button-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.dsa-button:active:not(:disabled) {
+	transform: translateY(1px);
 }
 
 .dsa-button:disabled {
+	cursor: not-allowed;
 	opacity: 0.55;
+	transform: none;
 }
 
 .dsa-run {
-	background: var(--fg-hover-color);
+	border-color: var(--border-color);
+	background: var(--card-bg);
+	color: var(--text-color);
 }
 
 .dsa-run:hover:not(:disabled) {
+	border-color: var(--border-color);
 	background: var(--fg-hover-color);
 }
 
+.dsa-run:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
+
 .dsa-submit {
+	border-color: #1c7a43;
 	color: #fff;
 	background: #1e8e4d;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .dsa-submit:hover:not(:disabled) {
+	border-color: #1c7a43;
 	background: #24a45a;
+}
+
+.dsa-submit:active:not(:disabled) {
+	background: #1b7d44;
+	box-shadow: none;
+}
+
+.dsa-submit:focus-visible {
+	outline: 2px solid #24a45a;
+	outline-offset: 2px;
 }
 
 .dsa-editor-toolbar {
@@ -2098,9 +2387,42 @@ onBeforeUnmount(() => {
 	color: var(--text-on-green);
 }
 
+.dsa-result-summary strong.rejected {
+	color: var(--text-on-red);
+}
+
 .dsa-result-summary strong.running,
 .dsa-result-summary span {
 	color: var(--text-muted);
+}
+
+.dsa-complexity-info {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 24px;
+	margin-bottom: 18px;
+	padding: 10px 14px;
+	border: 1px solid var(--border-color);
+	border-radius: 7px;
+	background: var(--control-bg);
+	font-family: var(--font-stack);
+}
+
+.dsa-complexity-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	font-size: 12px;
+}
+
+.dsa-complexity-row label {
+	margin: 0;
+	color: var(--text-muted);
+	font-weight: 600;
+}
+
+.dsa-complexity-row span {
+	color: var(--text-color);
 }
 
 .result-cases {
@@ -2261,6 +2583,11 @@ onBeforeUnmount(() => {
 		width: 100%;
 		margin-left: 0;
 	}
+
+	.dsa-complexity-info {
+		flex-direction: column;
+		gap: 8px;
+	}
 }
 
 .submission-status.accepted {
@@ -2329,8 +2656,16 @@ body.dsa-resizing {
 }
 
 .complexity-result {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     margin-left: 6px;
     font-weight: 500;
+}
+
+.complexity-result-icon {
+    font-size: 0.95em;
+    line-height: 1;
 }
 
 .complexity-result.optimal {
@@ -2339,9 +2674,14 @@ body.dsa-resizing {
 
 .complexity-result.too-complex {
     color: #e05757;
+    font-weight: 600;
 }
 
 .complexity-result.unknown {
     color: #999;
+}
+
+.complexity-result.unknown .complexity-result-icon {
+    display: none;
 }
 </style>
