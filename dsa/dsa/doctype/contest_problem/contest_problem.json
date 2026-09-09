@@ -1,37 +1,56 @@
 {
+ "actions": [],
+ "creation": "2026-08-31 14:31:48.438312",
  "doctype": "DocType",
- "name": "Contest Problem",
- "module": "DSA",
- "istable": 1,
  "editable_grid": 1,
+ "engine": "InnoDB",
  "field_order": [
   "problem",
   "order",
-  "points"
+  "points",
+  "time_given"
  ],
  "fields": [
   {
    "fieldname": "problem",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Problem",
    "options": "DSAProblem",
-   "reqd": 1,
-   "in_list_view": 1
+   "reqd": 1
   },
   {
    "fieldname": "order",
    "fieldtype": "Int",
+   "in_list_view": 1,
    "label": "Order",
-   "reqd": 1,
-   "in_list_view": 1
+   "reqd": 1
   },
   {
    "fieldname": "points",
    "fieldtype": "Int",
+   "in_list_view": 1,
    "label": "Points",
-   "reqd": 1,
-   "in_list_view": 1
+   "reqd": 1
+  },
+  {
+   "fieldname": "time_given",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Time Given",
+   "reqd": 1
   }
- ]
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-06 12:00:26.092048",
+ "modified_by": "Administrator",
+ "module": "DSA",
+ "name": "Contest Problem",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
 }
-

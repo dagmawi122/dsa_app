@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import code
+import re
 from typing import Any
 
 import frappe
@@ -14,6 +16,16 @@ from dsa.dsa.doctype.contest.contest import get_contest_status
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
 PENDING_STATUS_IDS = {1, 2}
+COMPLEXITY_RANK = {
+    "O(1)": 0,
+    "O(log n)": 1,
+    "O(n)": 2,
+    "O(n log n)": 3,
+    "O(n²)": 4,
+    "O(n³)": 5,
+    "O(2^n)": 6,
+    "O(n!)": 7,
+}
 
 
 def _map_judge0_status(status_id: int | None, output_matches: bool) -> str:
@@ -136,6 +148,7 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 		str(language_id): problem.get(starter_field) or ""
 		for language_id, (starter_field, _wrapper_field) in LANGUAGE_CODE_FIELDS.items()
 	}
+
 	return {
 		"name": problem.name,
 		"route_slug": problem.route_slug,
@@ -146,6 +159,8 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 		"topics": [row.topic for row in problem.get("topics", [])],
 		"examples": problem.examples,
 		"constraints": problem.constraints,
+		"time_complexity": problem.time_complexity,
+		"space_complexity": problem.space_complexity,
 		"starter_code": starter_codes[str(DEFAULT_LANGUAGE_ID)],
 		"starter_codes": starter_codes,
 		"test_cases": [
@@ -201,8 +216,10 @@ def _contest_payload(contest, current_time=None, include_problems=False) -> dict
 		payload["problems"] = [
 			{
 				"problem": row.problem,
+				"title": frappe.db.get_value("DSAProblem", row.problem, "title") or row.problem,
 				"order": row.order,
 				"points": row.points,
+				"time_given": row.time_given,
 			}
 			for row in (contest.problems or [])
 		]
@@ -268,33 +285,75 @@ def get_submissions(problem: str) -> list[dict[str, Any]]:
 			"code",
 			"language_id",
 			"creation",
+            "runtime",
 		],
 		order_by="creation desc",
 		limit_page_length=50,
 	)
 
 
+
 @frappe.whitelist(methods=["POST"])
 def run_code(
-	problem: str,
-	code: str,
-	stdin: str = "",
-	language_id: int = DEFAULT_LANGUAGE_ID,
-	test_case_index: int | None = None,
+    problem: str,
+    code: str,
+    stdin: str = "",
+    language_id: int = DEFAULT_LANGUAGE_ID,
+    test_case_index: int | None = None,
 ) -> dict[str, Any]:
-	_require_login()
-	if not code or not code.strip():
-		frappe.throw(_("Enter some code before running it."))
-	language_id = cint(language_id)
-	problem_doc = frappe.get_doc("DSAProblem", problem)
-	source_code = _build_source_code(problem_doc, code, language_id)
-	expected_output = _official_expected_output(problem_doc, stdin or "", test_case_index)
-	return {
-		"token": _create_judge0_submission(
-			source_code, stdin or "", language_id, expected_output=expected_output
-		)
-	}
+    _require_login()
 
+    if not code or not code.strip():
+        frappe.throw(_("Enter some code before running it."))
+
+    language_id = cint(language_id)
+    problem_doc = frappe.get_doc("DSAProblem", problem)
+
+
+
+    source_code = _build_source_code(problem_doc, code, language_id)
+
+    expected_output = _official_expected_output(
+        problem_doc,
+        stdin or "",
+        test_case_index,
+    )
+
+    time_complexity = _estimate_time_complexity(code)
+    space_complexity = _estimate_space_complexity(code)
+
+    time_complexity_result = _compare_complexity(
+        time_complexity,
+        problem_doc.time_complexity,
+    )
+
+    space_complexity_result = _compare_complexity(
+        space_complexity,
+        problem_doc.space_complexity,
+    )
+
+
+
+    execution_token = _create_judge0_submission(
+        source_code,
+        stdin or "",
+        language_id,
+        expected_output=expected_output,
+    )
+
+    if time_complexity_result == "Too Complex" or space_complexity_result == "Too Complex":
+        complexity_status = "Rejected"
+    else:
+        complexity_status = "Accepted"
+
+    return {
+        "token": execution_token,
+        "complexity": time_complexity,
+        "space_complexity": space_complexity,
+        "complexity_result": time_complexity_result,
+        "space_complexity_result": space_complexity_result,
+        "complexity_status": complexity_status,
+    }
 
 @frappe.whitelist()
 def get_run_result(token: str) -> dict[str, Any]:
@@ -322,6 +381,7 @@ def get_run_result(token: str) -> dict[str, Any]:
 	}
 
 
+
 def _create_dsa_submission(
 	problem_doc,
 	user: str,
@@ -338,6 +398,19 @@ def _create_dsa_submission(
 
 	language_id = cint(language_id)
 
+	time_complexity = _estimate_time_complexity(code)
+	space_complexity = _estimate_space_complexity(code)
+
+	time_complexity_result = _compare_complexity(
+		time_complexity,
+		problem_doc.time_complexity,
+	)
+
+	space_complexity_result = _compare_complexity(
+		space_complexity,
+		problem_doc.space_complexity,
+	)
+
 	source_code = _build_source_code(
 		problem_doc,
 		code,
@@ -351,6 +424,10 @@ def _create_dsa_submission(
 	submission.code = code
 	submission.language_id = language_id
 	submission.status = "Queued"
+	submission.time_complexity = time_complexity
+	submission.space_complexity = space_complexity
+	submission.complexity_result = time_complexity_result
+	submission.space_complexity_result = space_complexity_result
 
 	for index, test_case in enumerate(
 		problem_doc.test_cases,
@@ -397,6 +474,7 @@ def _get_contest_problem(
 			"problem",
 			"points",
 			"order",
+			"time_given",
 		],
 		as_dict=True,
 	)
@@ -407,7 +485,13 @@ def _get_contest_problem(
 	if cint(contest_problem.points) < 0:
 		frappe.throw(_("Contest problem points cannot be negative."))
 
+	if cint(contest_problem.time_given) < 0:
+		frappe.throw(
+			_("Contest problem time given cannot be negative.")
+		)
+
 	return contest_problem
+
 
 
 def _require_contest_participant(contest: str, user: str):
@@ -475,6 +559,32 @@ def submit_contest_code(
 		problem=problem,
 	)
 
+	attempt = frappe.db.get_value(
+		"Contest Problem Attempt",
+		{
+			"contest": contest_doc.name,
+			"problem": problem,
+			"user": user,
+		},
+		["name", "started_at"],
+		as_dict=True,
+	)
+
+	if not attempt:
+		attempt = frappe.get_doc(
+			{
+				"doctype": "Contest Problem Attempt",
+				"contest": contest_doc.name,
+				"problem": problem,
+				"user": user,
+				"started_at": frappe.utils.now_datetime(),
+			}
+		)
+
+		attempt.insert(
+			ignore_permissions=True
+		)
+
 	# Anti-spam cooldown check (3 seconds)
 	last_sub = frappe.db.get_value(
 		"Contest Submission",
@@ -483,13 +593,36 @@ def submit_contest_code(
 		order_by="creation desc",
 	)
 	if last_sub:
-		if frappe.utils.time_diff_in_seconds(frappe.utils.now_datetime(), last_sub) < 3:
+		if frappe.utils.time_diff_in_seconds(
+			frappe.utils.now_datetime(),
+			last_sub,
+		) < 3:
 			frappe.throw(_("Please wait a few seconds before submitting again."))
 
 	# 4. Load the DSA problem.
 	problem_doc = frappe.get_doc(
 		"DSAProblem",
 		problem,
+	)
+
+	time_complexity = _estimate_time_complexity(code)
+	space_complexity = _estimate_space_complexity(code)
+
+	time_complexity_result = _compare_complexity(
+		time_complexity,
+		problem_doc.time_complexity,
+	)
+
+	space_complexity_result = _compare_complexity(
+		space_complexity,
+		problem_doc.space_complexity,
+	)
+
+	complexity_status = (
+		"Rejected"
+		if time_complexity_result == "Too Complex"
+		or space_complexity_result == "Too Complex"
+		else "Accepted"
 	)
 
 	# 5. Create the normal DSA submission.
@@ -521,30 +654,72 @@ def submit_contest_code(
 		"status": contest_submission.status,
 		"score": contest_submission.score,
 		"points": contest_problem.points,
+		"complexity": time_complexity,
+		"space_complexity": space_complexity,
+		"complexity_result": time_complexity_result,
+		"space_complexity_result": space_complexity_result,
+		"complexity_status": complexity_status,
 	}
-
 
 def _calculate_contest_submission_score(
 	contest: str,
 	problem: str,
 	status: str,
+	submission_time,
+	member: str,
 ) -> int:
 	"""Calculate the score earned by a contest submission."""
 
 	if status != "Accepted":
 		return 0
 
-	points = frappe.db.get_value(
+	contest_problem = frappe.db.get_value(
 		"Contest Problem",
 		{
 			"parent": contest,
 			"parenttype": "Contest",
 			"problem": problem,
 		},
-		"points",
+		["points", "time_given"],
+		as_dict=True,
 	)
 
-	return cint(points or 0)
+	if not contest_problem:
+		return 0
+
+	points = cint(contest_problem.points or 0)
+	time_given = cint(contest_problem.time_given or 0)
+
+	attempt_started_at = frappe.db.get_value(
+		"Contest Problem Attempt",
+		{
+			"contest": contest,
+			"problem": problem,
+			"user": member,
+		},
+		"started_at",
+	)
+
+	if not attempt_started_at or not submission_time:
+		return points
+
+	if time_given <= 0:
+		return points
+
+	elapsed_seconds = frappe.utils.time_diff_in_seconds(
+		submission_time,
+		attempt_started_at,
+	)
+
+	allowed_seconds = time_given * 60
+	overtime_seconds = max(
+		0,
+		elapsed_seconds - allowed_seconds,
+	)
+
+	penalty = int(overtime_seconds // 600)
+
+	return max(points - penalty, 0)
 
 
 def _refresh_contest_submission(
@@ -562,9 +737,16 @@ def _refresh_contest_submission(
 
 	result = _refresh_submission(dsa_submission)
 
-	# Keep contest submission Running while Judge0 is still processing.
+	complexity_rejected = (
+		result["complexity_result"] == "Too Complex"
+		or result["space_complexity_result"] == "Too Complex"
+	)
+
 	if result["pending"]:
 		contest_submission.status = "Running"
+		contest_submission.score = 0
+	elif complexity_rejected:
+		contest_submission.status = "Failed"
 		contest_submission.score = 0
 	else:
 		contest_submission.status = result["status"]
@@ -572,6 +754,8 @@ def _refresh_contest_submission(
 			contest=contest_submission.contest,
 			problem=contest_submission.problem,
 			status=contest_submission.status,
+			submission_time=contest_submission.submission_time,
+			member=contest_submission.member,
 		)
 
 	contest_submission.save(ignore_permissions=True)
@@ -582,12 +766,21 @@ def _refresh_contest_submission(
 		"problem": contest_submission.problem,
 		"pending": result["pending"],
 		"status": contest_submission.status,
+		"display_status": (
+			"Rejected"
+			if complexity_rejected
+			else contest_submission.status
+		),
 		"score": contest_submission.score,
 		"passed_count": result["passed_count"],
 		"total_count": result["total_count"],
 		"results": result["results"],
+		"runtime": result["runtime"],
+		"time_complexity": result["time_complexity"],
+		"space_complexity": result["space_complexity"],
+		"complexity_result": result["complexity_result"],
+		"space_complexity_result": result["space_complexity_result"],
 	}
-
 
 @frappe.whitelist()
 def get_contest_submission_result(
@@ -624,6 +817,7 @@ def _get_contest_score_data(
 			"member": member,
 		},
 		fields=[
+			"name",
 			"problem",
 			"status",
 			"score",
@@ -931,7 +1125,6 @@ def get_contest_submissions(
 
 	return submissions
 
-
 @frappe.whitelist()
 def get_contest_leaderboard(
 	contest: str,
@@ -958,18 +1151,29 @@ def get_contest_leaderboard(
 		],
 	)
 
-	participant_users = [participant.user for participant in participants]
+	participant_users = [
+		participant.user
+		for participant in participants
+	]
 
 	user_names = {}
 
 	if participant_users:
 		users = frappe.get_all(
 			"User",
-			filters={"name": ["in", participant_users]},
-			fields=["name", "full_name"],
+			filters={
+				"name": ["in", participant_users],
+			},
+			fields=[
+				"name",
+				"full_name",
+			],
 		)
 
-		user_names = {user.name: user.full_name for user in users}
+		user_names = {
+			user.name: user.full_name
+			for user in users
+		}
 
 	submissions = frappe.get_all(
 		"Contest Submission",
@@ -977,6 +1181,7 @@ def get_contest_leaderboard(
 			"contest": contest,
 		},
 		fields=[
+			"name",
 			"member",
 			"problem",
 			"status",
@@ -986,14 +1191,28 @@ def get_contest_leaderboard(
 		order_by="submission_time asc",
 	)
 
+	for submission in submissions:
+		if submission.status in {"Queued", "Running"}:
+			contest_submission = frappe.get_doc(
+				"Contest Submission",
+				submission.name,
+			)
+
+			result = _refresh_contest_submission(
+				contest_submission
+			)
+
+			submission.status = result["status"]
+			submission.score = result["score"]
+
 	participant_data = {
 		participant.user: {
 			"member": participant.user,
 			"total_score": 0,
 			"solved_count": 0,
 			"submission_count": 0,
-			"last_accepted_at": None,
 			"problem_scores": {},
+			"problem_times": {},
 		}
 		for participant in participants
 	}
@@ -1005,6 +1224,7 @@ def get_contest_leaderboard(
 			continue
 
 		participant = participant_data[member]
+
 		participant["submission_count"] += 1
 
 		if submission.status != "Accepted":
@@ -1013,18 +1233,63 @@ def get_contest_leaderboard(
 		problem = submission.problem
 		score = cint(submission.score or 0)
 
-		current_score = participant["problem_scores"].get(problem, 0)
+		current_score = participant["problem_scores"].get(
+			problem,
+			0,
+		)
 
 		participant["problem_scores"][problem] = max(
 			current_score,
 			score,
 		)
 
-		participant["last_accepted_at"] = submission.submission_time
+		attempt_started_at = frappe.db.get_value(
+			"Contest Problem Attempt",
+			{
+				"contest": contest,
+				"problem": problem,
+				"user": member,
+			},
+			"started_at",
+		)
+
+		if not attempt_started_at:
+			continue
+
+		elapsed_seconds = frappe.utils.time_diff_in_seconds(
+			submission.submission_time,
+			attempt_started_at,
+		)
+
+		elapsed_seconds = max(
+			elapsed_seconds,
+			0,
+		)
+
+		current_time = participant["problem_times"].get(
+			problem,
+		)
+
+		if current_time is None:
+			participant["problem_times"][problem] = elapsed_seconds
+		else:
+			participant["problem_times"][problem] = min(
+				current_time,
+				elapsed_seconds,
+			)
 
 	for participant in participant_data.values():
-		participant["total_score"] = sum(participant["problem_scores"].values())
-		participant["solved_count"] = len(participant["problem_scores"])
+		participant["total_score"] = sum(
+			participant["problem_scores"].values()
+		)
+
+		participant["solved_count"] = len(
+			participant["problem_scores"]
+		)
+
+		participant["total_solving_time"] = sum(
+			participant["problem_times"].values()
+		)
 
 	leaderboard = []
 
@@ -1032,11 +1297,15 @@ def get_contest_leaderboard(
 		leaderboard.append(
 			{
 				"member": participant["member"],
-				"full_name": user_names.get(participant["member"]),
+				"full_name": user_names.get(
+					participant["member"]
+				),
 				"total_score": participant["total_score"],
 				"solved_count": participant["solved_count"],
 				"submission_count": participant["submission_count"],
-				"time": participant["last_accepted_at"],
+				"total_solving_time": participant[
+					"total_solving_time"
+				],
 			}
 		)
 
@@ -1044,19 +1313,21 @@ def get_contest_leaderboard(
 		key=lambda row: (
 			-row["total_score"],
 			-row["solved_count"],
-			row["time"] is None,
-			row["time"] or "",
+			row["total_solving_time"],
 		)
 	)
 
 	previous_key = None
 	current_rank = 0
 
-	for index, row in enumerate(leaderboard, start=1):
+	for index, row in enumerate(
+		leaderboard,
+		start=1,
+	):
 		rank_key = (
 			row["total_score"],
 			row["solved_count"],
-			row["time"],
+			row["total_solving_time"],
 		)
 
 		if rank_key != previous_key:
@@ -1069,7 +1340,6 @@ def get_contest_leaderboard(
 		"contest": contest,
 		"leaderboard": leaderboard,
 	}
-
 
 @frappe.whitelist(methods=["POST"])
 def submit_code(
@@ -1084,6 +1354,26 @@ def submit_code(
 		problem,
 	)
 
+	time_complexity = _estimate_time_complexity(code)
+	space_complexity = _estimate_space_complexity(code)
+
+	time_complexity_result = _compare_complexity(
+		time_complexity,
+		problem_doc.time_complexity,
+	)
+
+	space_complexity_result = _compare_complexity(
+		space_complexity,
+		problem_doc.space_complexity,
+	)
+
+	complexity_status = (
+		"Rejected"
+		if time_complexity_result == "Too Complex"
+		or space_complexity_result == "Too Complex"
+		else "Accepted"
+	)
+
 	submission = _create_dsa_submission(
 		problem_doc=problem_doc,
 		user=user,
@@ -1094,20 +1384,37 @@ def submit_code(
 	return {
 		"submission": submission.name,
 		"status": submission.status,
+		"complexity": time_complexity,
+		"space_complexity": space_complexity,
+		"complexity_result": time_complexity_result,
+		"space_complexity_result": space_complexity_result,
+		"complexity_status": complexity_status,
 	}
-
 
 def _normalized_output(value: str | None) -> str:
 	return (value or "").replace("\r\n", "\n").rstrip()
 
-
 def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]:
 	pending = False
 	passed = 0
+	total_runtime = 0.0
 	public_results = []
+
 	for row in doc.results:
+		result = _get_judge0_submission(row.token)
+		judge_status = result.get("status") or {}
+
+		judge_runtime = result.get("time")
+
+		if judge_runtime is not None:
+			try:
+				total_runtime += float(judge_runtime)
+			except (TypeError, ValueError):
+				pass
+
 		if row.status in {"Accepted", "Failed"}:
 			passed += row.status == "Accepted"
+
 			public_results.append(
 				{
 					"index": row.test_case_index,
@@ -1118,24 +1425,41 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
 					"error": row.error_output or None,
 				}
 			)
+
 			continue
 
-		result = _get_judge0_submission(row.token)
-		judge_status = result.get("status") or {}
 		if judge_status.get("id") in PENDING_STATUS_IDS:
 			pending = True
-			public_results.append({"index": row.test_case_index, "status": "Running", "input": row.input})
+
+			public_results.append(
+				{
+					"index": row.test_case_index,
+					"status": "Running",
+					"input": row.input,
+				}
+			)
+
 			continue
 
 		row.actual_output = result.get("stdout") or ""
-		row.error_output = result.get("compile_output") or result.get("stderr") or result.get("message") or ""
+
+		row.error_output = (
+			result.get("compile_output")
+			or result.get("stderr")
+			or result.get("message")
+			or ""
+		)
+
 		row.status = (
 			"Accepted"
 			if judge_status.get("id") == 3
-			and _normalized_output(row.actual_output) == _normalized_output(row.expected_output)
+			and _normalized_output(row.actual_output)
+			== _normalized_output(row.expected_output)
 			else "Failed"
 		)
+
 		passed += row.status == "Accepted"
+
 		public_results.append(
 			{
 				"index": row.test_case_index,
@@ -1149,20 +1473,39 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
 		)
 
 	doc.passed_count = passed
+	doc.runtime = total_runtime
+
+	complexity_rejected = (
+		doc.complexity_result == "Too Complex"
+		or doc.space_complexity_result == "Too Complex"
+	)
+
 	if pending:
 		doc.status = "Running"
+	elif complexity_rejected:
+		doc.status = "Failed"
 	else:
-		doc.status = "Accepted" if passed == doc.total_count else "Failed"
+		doc.status = (
+			"Accepted"
+			if passed == doc.total_count
+			else "Failed"
+		)
+
 	doc.save(ignore_permissions=True)
 
 	return {
 		"pending": pending,
 		"status": doc.status,
+		"display_status": "Rejected" if complexity_rejected else doc.status,
 		"passed_count": doc.passed_count,
 		"total_count": doc.total_count,
+		"runtime": doc.runtime,
 		"results": public_results,
+		"time_complexity": doc.time_complexity,
+		"space_complexity": doc.space_complexity,
+		"complexity_result": doc.complexity_result,
+		"space_complexity_result": doc.space_complexity_result,
 	}
-
 
 @frappe.whitelist()
 def get_submission_result(submission: str) -> dict[str, Any]:
@@ -1171,3 +1514,286 @@ def get_submission_result(submission: str) -> dict[str, Any]:
 	if doc.member != user and "System Manager" not in frappe.get_roles(user):
 		frappe.throw(_("You cannot view this submission."), frappe.PermissionError)
 	return _refresh_submission(doc)
+
+def _estimate_time_complexity(code: str) -> str:
+    code = re.sub(r"//.*", "", code)
+    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+
+    if re.search(
+        r"\b(for|while)\s*\([^)]*\b(i|j|k|n|size|len|length)\b[^)]*"
+        r"(?:\*=|/=)\s*\d+",
+        code,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b\w+\s*(?:/=|\*=)\s*\d+\s*;",
+        code,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b(for|while)\s*\([^)]*\b(low|high|left|right|lo|hi)\b"
+        r"[^)]*\b(mid|middle)\b",
+        code,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b(low|high|left|right|lo|hi)\b.*[<>]=?.*\b(mid|middle)\b"
+        r"|\b(mid|middle)\b.*[<>]=?.*\b(low|high|left|right|lo|hi)\b",
+        code,
+        re.DOTALL,
+    ):
+        return "O(log n)"
+
+    if re.search(
+        r"\b(sort|stable_sort)\s*\(",
+        code,
+    ):
+        return "O(n log n)"
+
+    function_pattern = re.compile(
+        r"\b(?:int|void|bool|string|long|double|float|char)\s+"
+        r"(\w+)\s*\([^)]*\)\s*\{"
+    )
+
+    for match in function_pattern.finditer(code):
+        function_name = match.group(1)
+
+        brace_pos = match.end() - 1
+        depth = 1
+        i = brace_pos + 1
+
+        while i < len(code) and depth:
+            if code[i] == "{":
+                depth += 1
+            elif code[i] == "}":
+                depth -= 1
+            i += 1
+
+        function_body = code[match.end():i - 1]
+
+        recursive_calls = re.findall(
+            rf"\b{re.escape(function_name)}\s*\(",
+            function_body,
+        )
+
+        if recursive_calls:
+            recursive_call_pattern = re.compile(
+                rf"\b{re.escape(function_name)}\s*\("
+            )
+
+            for loop_match in re.finditer(
+                r"\bfor\s*\([^)]*\)",
+                function_body,
+            ):
+                loop_start = loop_match.end()
+                brace_pos = function_body.find("{", loop_start)
+
+                if brace_pos == -1:
+                    continue
+
+                depth = 1
+                j = brace_pos + 1
+
+                while j < len(function_body) and depth:
+                    if function_body[j] == "{":
+                        depth += 1
+                    elif function_body[j] == "}":
+                        depth -= 1
+                    j += 1
+
+                loop_body = function_body[brace_pos:j]
+
+                if recursive_call_pattern.search(loop_body):
+                    return "O(n!)"
+
+            if len(recursive_calls) >= 2:
+                return "O(2^n)"
+
+            return "O(n)"
+
+    loop_pattern = re.compile(r"\b(for|while)\s*\(")
+    loops = []
+
+    for match in loop_pattern.finditer(code):
+        start = match.end()
+        brace_pos = code.find("{", start)
+
+        if brace_pos == -1:
+            continue
+
+        header = code[match.start():brace_pos]
+
+        constant_loop = bool(
+            re.search(
+                r"(?:<|<=)\s*\d+\b",
+                header,
+            )
+        )
+
+        depth = 1
+        i = brace_pos + 1
+
+        while i < len(code) and depth:
+            if code[i] == "{":
+                depth += 1
+            elif code[i] == "}":
+                depth -= 1
+            i += 1
+
+        loops.append(
+            {
+                "start": match.start(),
+                "body_start": brace_pos,
+                "end": i,
+                "constant": constant_loop,
+            }
+        )
+
+    variable_loops = [
+        loop for loop in loops
+        if not loop["constant"]
+    ]
+
+    max_loop_depth = 0
+
+    for loop in variable_loops:
+        depth = 1
+
+        for other in variable_loops:
+            if (
+                other["body_start"] > loop["body_start"]
+                and other["end"] < loop["end"]
+            ):
+                depth += 1
+
+        max_loop_depth = max(max_loop_depth, depth)
+
+    if max_loop_depth >= 3:
+        return "O(n³)"
+
+    if max_loop_depth == 2:
+        return "O(n²)"
+
+    if max_loop_depth == 1:
+        return "O(n)"
+
+    return "O(1)"
+
+def _estimate_space_complexity(code: str) -> str:
+    code = re.sub(r"//.*", "", code)
+    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+
+    if re.search(
+        r"\b(vector|deque|list|set|unordered_set|map|unordered_map)\s*"
+        r"<[^;]+>\s+\w+\s*(?:\([^;]*\))?\s*;",
+        code,
+    ):
+        return "O(n)"
+
+    if re.search(
+        r"\b(vector|deque|list|set|unordered_set|map|unordered_map)\s*"
+        r"<[^;]+>\s+\w+\s*;",
+        code,
+    ):
+        return "O(n)"
+
+    if re.search(
+        r"\b(new|malloc|calloc|realloc)\s*\(",
+        code,
+    ):
+        return "O(n)"
+
+    function_match = re.search(
+        r"\b(?:int|void|bool|string|long|double|float|char)\s+"
+        r"(\w+)\s*\([^)]*\)\s*\{",
+        code,
+    )
+
+    if function_match:
+        function_name = function_match.group(1)
+
+        if re.search(
+            rf"\b{re.escape(function_name)}\s*\(",
+            code[function_match.end():],
+        ):
+            return "O(n)"
+
+    return "O(1)"
+
+def _compare_complexity(
+    actual: str,
+    expected: str,
+) -> str:
+    if not expected:
+        return "Unknown"
+
+    actual_rank = COMPLEXITY_RANK.get(actual)
+    expected_rank = COMPLEXITY_RANK.get(expected)
+
+    if actual_rank is None or expected_rank is None:
+        return "Unknown"
+
+    if actual_rank <= expected_rank:
+        return "Optimal"
+
+    return "Too Complex"
+
+@frappe.whitelist()
+def start_contest_problem(
+    contest: str,
+    problem: str,
+) -> dict[str, Any]:
+    """Get or create the start time for a user's contest problem."""
+
+    user = _require_login()
+
+    contest_doc = _require_active_contest(contest)
+
+    _require_contest_participant(
+        contest=contest,
+        user=user,
+    )
+
+    _get_contest_problem(
+        contest=contest,
+        problem=problem,
+    )
+
+    existing = frappe.db.get_value(
+        "Contest Problem Attempt",
+        {
+            "contest": contest_doc.name,
+            "problem": problem,
+            "user": user,
+        },
+        ["name", "started_at"],
+        as_dict=True,
+    )
+
+    if existing:
+        return {
+            "attempt": existing.name,
+            "started_at": existing.started_at,
+        }
+
+    started_at = now_datetime()
+
+    attempt = frappe.get_doc(
+        {
+            "doctype": "Contest Problem Attempt",
+            "contest": contest_doc.name,
+            "problem": problem,
+            "user": user,
+            "started_at": started_at,
+        }
+    )
+
+    attempt.insert(ignore_permissions=True)
+
+    return {
+        "attempt": attempt.name,
+        "started_at": attempt.started_at,
+    }

@@ -553,6 +553,10 @@ const testResults = ref([]);
 const activeResultCaseIndex = ref(0);
 const overallStatus = ref("");
 const resultRuntime = ref("");
+const resultComplexity = ref("");
+const resultSpaceComplexity = ref("");
+const complexityResult = ref("");
+const spaceComplexityResult = ref("");
 const activeProblemTab = ref("description");
 const showHint = ref(false);
 const activeResultTab = ref("testcase");
@@ -644,16 +648,40 @@ function formatSubmissionTime(submission) {
 	return submission.submission_time || submission.creation || "—";
 }
 
-function startTimer() {
-	if (!props.contestMode) return;
+function startTimer(startedAt) {
+    if (!props.contestMode || !startedAt) return;
 
 	clearInterval(timerInterval);
 
-	elapsedTime.value = 0;
+    const startTime = new Date(startedAt).getTime();
 
-	timerInterval = setInterval(() => {
-		elapsedTime.value += 1;
-	}, 1000);
+    const updateElapsedTime = () => {
+        elapsedTime.value = Math.max(
+            0,
+            Math.floor((Date.now() - startTime) / 1000)
+        );
+    };
+
+    updateElapsedTime();
+
+    timerInterval = setInterval(updateElapsedTime, 1000);
+}
+
+async function startContestProblem() {
+    if (!props.contestMode || !props.contestName || !problem.value) {
+        return;
+    }
+
+    const attempt = await call(
+        "dsa.api.start_contest_problem",
+        {
+            contest: props.contestName,
+            problem: problem.value.name,
+        },
+        "POST"
+    );
+
+    startTimer(attempt.started_at);
 }
 
 function changeLanguage() {
@@ -679,11 +707,15 @@ function addTestCase() {
 }
 
 function clearResults() {
-	terminalOutput.value = "";
-	testResults.value = [];
-	overallStatus.value = "";
-	resultRuntime.value = "";
-	activeResultCaseIndex.value = 0;
+    terminalOutput.value = "";
+    testResults.value = [];
+    overallStatus.value = "";
+    resultRuntime.value = "";
+    resultComplexity.value = "";
+    resultSpaceComplexity.value = "";
+    complexityResult.value = "";
+    spaceComplexityResult.value = "";
+    activeResultCaseIndex.value = 0;
 }
 
 async function selectProblemTab(tab) {
@@ -830,7 +862,12 @@ async function call(method, args = {}, type = "GET") {
 		type,
 	});
 
-	return response.message;
+    if (method === "dsa.api.run_code") {
+        console.log("FULL FRAPPE RESPONSE:", response);
+        console.log("MESSAGE:", response.message);
+    }
+
+    return response.message;
 }
 
 function sanitize(value) {
@@ -919,7 +956,7 @@ onMounted(async () => {
 
 			await loadProblem(props.problemName);
 
-			startTimer();
+            await startContestProblem();
 
 			return;
 		}
@@ -942,7 +979,8 @@ async function runCode() {
 	activeResultTab.value = "result";
 
 	try {
-		const input = testCases.value[activeTestCaseIndex.value]?.input || "";
+		const input =
+			testCases.value[activeTestCaseIndex.value]?.input || "";
 
 		const queued = await call(
 			"dsa.api.run_code",
@@ -956,15 +994,39 @@ async function runCode() {
 			"POST"
 		);
 
-		for (let attempt = 0; attempt < 60 && generation === currentGeneration; attempt += 1) {
+		for (
+			let attempt = 0;
+			attempt < 60 && generation === currentGeneration;
+			attempt += 1
+		) {
 			const result = await call("dsa.api.get_run_result", {
 				token: queued.token,
 			});
 
 			if (!result.pending) {
-				overallStatus.value = result.status || __("Finished");
+				const complexityRejected =
+					queued.complexity_result === "Too Complex" ||
+					queued.space_complexity_result === "Too Complex";
 
-				resultRuntime.value = result.time ? `${result.time} s` : "";
+				overallStatus.value = complexityRejected
+					? "Rejected"
+					: result.status || __("Finished");
+
+				resultRuntime.value = result.time
+					? `${result.time} s`
+					: "";
+
+				resultComplexity.value =
+					queued.complexity || "";
+
+				resultSpaceComplexity.value =
+					queued.space_complexity || "";
+
+				complexityResult.value =
+					queued.complexity_result || "";
+
+				spaceComplexityResult.value =
+					queued.space_complexity_result || "";
 
 				testResults.value = [
 					{
@@ -973,7 +1035,10 @@ async function runCode() {
 						input,
 						expected_output: result.expected_output,
 						actual_output: result.stdout,
-						error: result.compile_output || result.stderr || result.message,
+						error:
+							result.compile_output ||
+							result.stderr ||
+							result.message,
 					},
 				];
 
@@ -983,7 +1048,9 @@ async function runCode() {
 			await wait(1000);
 		}
 
-		terminalOutput.value = __("Execution timed out while waiting for Judge0.");
+		terminalOutput.value = __(
+			"Execution timed out while waiting for Judge0."
+		);
 	} catch (error) {
 		showError(error);
 	} finally {
@@ -1000,48 +1067,103 @@ async function submitCode() {
 
 	activeResultTab.value = "result";
 
-	try {
-		const method = props.contestMode ? "dsa.api.submit_contest_code" : "dsa.api.submit_code";
+    try {
+        const method = props.contestMode
+            ? "dsa.api.submit_contest_code"
+            : "dsa.api.submit_code";
 
-		const args = props.contestMode
-			? {
-					contest: frappe.get_route()[1],
-					problem: problem.value.name,
-					code: code.value,
-					language_id: selectedLanguageId.value,
-			  }
-			: {
-					problem: problem.value.name,
-					code: code.value,
-					language_id: selectedLanguageId.value,
-			  };
+        const args = props.contestMode
+            ? {
+                  contest: frappe.get_route()[1],
+                  problem: problem.value.name,
+                  code: code.value,
+                  language_id: selectedLanguageId.value,
+              }
+            : {
+                  problem: problem.value.name,
+                  code: code.value,
+                  language_id: selectedLanguageId.value,
+              };
 
-		const queued = await call(method, args, "POST");
+        const queued = await call(
+            method,
+            args,
+            "POST"
+        );
 
-		for (let attempt = 0; attempt < 60 && generation === currentGeneration; attempt += 1) {
-			const result = await call(
-				props.contestMode
-					? "dsa.api.get_contest_submission_result"
-					: "dsa.api.get_submission_result",
-				{
-					submission: props.contestMode ? queued.contest_submission : queued.submission,
-				}
-			);
+        resultComplexity.value = queued.complexity || "";
+        resultSpaceComplexity.value =
+            queued.space_complexity || "";
+        complexityResult.value =
+            queued.complexity_result || "";
+        spaceComplexityResult.value =
+            queued.space_complexity_result || "";
 
-			overallStatus.value = result.status;
-			testResults.value = result.results;
+        for (
+            let attempt = 0;
+            attempt < 60 &&
+            generation === currentGeneration;
+            attempt += 1
+        ) {
+            const result = await call(
+                props.contestMode
+                    ? "dsa.api.get_contest_submission_result"
+                    : "dsa.api.get_submission_result",
+                {
+                    submission: props.contestMode
+                        ? queued.contest_submission
+                        : queued.submission,
+                }
+            );
 
-			if (!result.pending) {
-				await loadSubmissions();
+            resultComplexity.value =
+                result.time_complexity ||
+                queued.complexity ||
+                "";
 
-				if (props.contestMode) {
-					await loadContestProgress();
-				}
+            resultSpaceComplexity.value =
+                result.space_complexity ||
+                queued.space_complexity ||
+                "";
 
-				return;
-			}
-			await wait(1000);
-		}
+            complexityResult.value =
+                result.complexity_result ||
+                queued.complexity_result ||
+                "";
+
+            spaceComplexityResult.value =
+                result.space_complexity_result ||
+                queued.space_complexity_result ||
+                "";
+
+            overallStatus.value =
+                result.display_status ||
+                result.status ||
+                __("Finished");
+
+            testResults.value = result.results || [];
+
+            if (!result.pending) {
+            await loadSubmissions();
+
+            if (props.contestMode) {
+                const accepted =
+                    result.status === "Accepted" ||
+                    result.status_id === 3;
+
+                if (accepted) {
+                    submissionMade.value = true;
+                    clearInterval(timerInterval);
+                }
+
+                await loadContestProgress();
+            }
+
+            return;
+        }
+
+            await wait(1000);
+        }
 
 		terminalOutput.value = __("Submission timed out while waiting for Judge0.");
 	} catch (error) {
@@ -1050,6 +1172,7 @@ async function submitCode() {
 		busy.value = false;
 	}
 }
+
 async function loadContestProgress() {
 	if (!props.contestMode) return;
 
@@ -1096,18 +1219,20 @@ function updatePageTitle() {
 }
 
 async function setContestProblem(contest, newProblemName) {
-	if (!newProblemName) return;
-	loading.value = true;
-	try {
-		await loadProblem(newProblemName);
-		if (props.contestMode) {
-			await loadContestProgress();
-		}
-	} catch (error) {
-		showError(error);
-	} finally {
-		loading.value = false;
-	}
+    if (!newProblemName) return;
+    loading.value = true;
+    try {
+        await loadProblem(newProblemName);
+
+        if (props.contestMode) {
+            await startContestProblem();
+            await loadContestProgress();
+        }
+    } catch (error) {
+        showError(error);
+    } finally {
+        loading.value = false;
+    }
 }
 
 defineExpose({
@@ -1381,6 +1506,32 @@ onBeforeUnmount(() => {
 	color: var(--text-color);
 	font-size: 13px;
 	line-height: 1.65;
+}
+
+.dsa-rich-text :deep(p),
+.dsa-rich-text :deep(span),
+.dsa-rich-text :deep(div),
+.dsa-rich-text :deep(li),
+.dsa-rich-text :deep(ul),
+.dsa-rich-text :deep(ol),
+.dsa-rich-text :deep(strong),
+.dsa-rich-text :deep(em),
+.dsa-rich-text :deep(b),
+.dsa-rich-text :deep(i) {
+    color: #ffffff;
+}
+
+.dsa-rich-text :deep(a) {
+    color: #6ea8fe;
+}
+
+.dsa-rich-text :deep(h1),
+.dsa-rich-text :deep(h2),
+.dsa-rich-text :deep(h3),
+.dsa-rich-text :deep(h4),
+.dsa-rich-text :deep(h5),
+.dsa-rich-text :deep(h6) {
+    color: #ffffff;
 }
 
 .dsa-rich-text :deep(pre) {
@@ -2175,5 +2326,22 @@ body.dsa-focus-mode .dsa-editor-page .layout-main-section {
 body.dsa-resizing {
 	cursor: col-resize !important;
 	user-select: none !important;
+}
+
+.complexity-result {
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+.complexity-result.optimal {
+    color: #28c76f;
+}
+
+.complexity-result.too-complex {
+    color: #e05757;
+}
+
+.complexity-result.unknown {
+    color: #999;
 }
 </style>
