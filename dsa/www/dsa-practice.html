@@ -1,0 +1,21 @@
+{% extends "templates/base.html" %}
+
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block banner %}{% endblock %}
+
+{% block content %}
+<main id="dsa-student-editor"
+	data-problem="{{ problem_name | e }}"
+	data-embedded="{{ '1' if embedded else '0' }}"
+	data-back-url="{{ back_url | e }}">
+</main>
+{% endblock %}
+
+{% block style %}
+{{ include_style('dsa_student.bundle.css') }}
+{% endblock %}
+
+{% block script %}
+{{ include_script('dsa_student.bundle.js') }}
+{% endblock %}
