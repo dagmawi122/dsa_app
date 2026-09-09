@@ -1,7 +1,7 @@
 <template>
 	<div class="dsa-practice-view" :class="{ 'is-standalone': !props.contestMode }">
-		<header v-if="!props.contestMode" class="dsa-practice-navigation">
-			<a href="/app/list-problems" class="dsa-back-button"
+		<header class="dsa-practice-navigation">
+			<button type="button" class="dsa-back-button" @click="props.contestMode ? goBackToContest() : goBackToProblems()"
 				><svg
 					aria-hidden="true"
 					viewBox="0 0 24 24"
@@ -10,16 +10,29 @@
 					stroke-width="1.8"
 				>
 					<path d="m10 6-6 6 6 6M4 12h16" /></svg
-				>{{ __("Problem list") }}</a
+				>{{ props.contestMode ? __("Back to Contest") : __("Problem list") }}</button
 			>
 			<div class="dsa-nav-title">
-				<span>{{ __("DSA Practice") }}</span
+				<span>{{ props.contestMode ? (props.contestName || __("Contest")) : __("DSA Practice") }}</span
 				><span aria-hidden="true">/</span
 				><strong>{{ problem?.title || __("Loading problem…") }}</strong>
 			</div>
 			<span class="dsa-nav-mark" aria-hidden="true">&lt;/&gt;</span>
 		</header>
 		<div v-if="loading" class="dsa-state">{{ __("Loading problem…") }}</div>
+		<div v-else-if="pageError" class="dsa-error-container">
+			<div class="dsa-error-card">
+				<div class="error-icon">!</div>
+				<h2>{{ pageError.title }}</h2>
+				<p>{{ pageError.message }}</p>
+				<button v-if="props.contestMode" type="button" class="contest-back-btn" @click="goBackToContest">
+					{{ __("Back to Contest") }}
+				</button>
+				<button v-else type="button" class="contest-back-btn" @click="goBackToProblems">
+					{{ __("Back to Problems") }}
+				</button>
+			</div>
+		</div>
 		<div v-else class="dsa-practice-content">
 			<p v-if="!problem" role="alert">
 				{{ __("Problem not found or could not be loaded.") }}
@@ -542,7 +555,21 @@ const languages = [
 ];
 
 const loading = ref(true);
+const pageError = ref(null);
 const problem = ref(null);
+
+function goBackToContest() {
+	const contest = props.contestName || frappe.get_route()[1];
+	if (contest) {
+		frappe.set_route("contest-comp", contest);
+	} else {
+		frappe.set_route("contest-page");
+	}
+}
+
+function goBackToProblems() {
+	frappe.set_route("list-problems");
+}
 const code = ref("");
 const busy = ref(false);
 const terminalOutput = ref("");
@@ -867,8 +894,28 @@ async function loadProblem(name, slug = null) {
 
 	expandedSubmission.value = null;
 	generation += 1;
+	pageError.value = null;
 
-	const loadedProblem = await call("dsa.api.get_problem", { name, slug });
+	let loadedProblem = null;
+	try {
+		loadedProblem = await call("dsa.api.get_problem", { name, slug });
+	} catch (error) {
+		console.error("Failed to load problem:", error);
+		const rawMsg = error?.messages?.join("\n") || error?.message || "";
+		if (rawMsg.toLowerCase().includes("not found")) {
+			pageError.value = {
+				title: __("Problem not found"),
+				message: __("The problem you're looking for could not be found.")
+			};
+		} else {
+			pageError.value = {
+				title: __("Unable to load problem"),
+				message: __("An error occurred while retrieving the problem. Please try again later.")
+			};
+		}
+		return;
+	}
+
 	if (disposed) return;
 	problem.value = loadedProblem;
 	updatePageTitle();
@@ -913,14 +960,22 @@ async function loadProblem(name, slug = null) {
 onMounted(async () => {
 	try {
 		if (props.contestMode) {
-			if (!props.problemName) {
-				throw new Error(__("No contest problem was specified."));
+			const route = frappe.get_route();
+			const cName = props.contestName || route[1];
+			const pName = props.problemName || route[2];
+
+			if (!cName) {
+				frappe.set_route("contest-page");
+				return;
 			}
 
-			await loadProblem(props.problemName);
+			if (!pName) {
+				frappe.set_route("contest-comp", cName);
+				return;
+			}
 
+			await loadProblem(pName);
 			startTimer();
-
 			return;
 		}
 
@@ -1125,6 +1180,75 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.dsa-error-container {
+	min-height: 400px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px;
+}
+.dsa-error-card {
+	background: var(--card-bg, #181818);
+	border: 1px solid var(--border-color, #2b2b2b);
+	border-radius: 12px;
+	padding: 40px;
+	text-align: center;
+	max-width: 480px;
+	width: 100%;
+}
+.dsa-error-card .error-icon {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	background: rgba(255, 77, 79, 0.15);
+	color: #ff4d4f;
+	font-size: 20px;
+	font-weight: 800;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 16px;
+}
+.dsa-error-card h2 {
+	margin: 0 0 10px;
+	font-size: 20px;
+	color: var(--text-color, #fff);
+}
+.dsa-error-card p {
+	color: var(--text-muted, #888);
+	font-size: 14px;
+	margin: 0 0 24px;
+	line-height: 1.5;
+}
+.contest-back-btn {
+	background: #252525;
+	border: 1px solid #383838;
+	color: #bbb;
+	padding: 8px 18px;
+	border-radius: 7px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	transition: all 0.2s ease;
+}
+.contest-back-btn:hover {
+	background: #303030;
+	color: #fff;
+}
+.dsa-back-button {
+	background: transparent;
+	border: 0;
+	color: var(--text-muted);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.dsa-back-button:hover {
+	color: var(--text-color);
+}
 .dsa-practice-view {
 	color: var(--text-color);
 	background: var(--bg-color);

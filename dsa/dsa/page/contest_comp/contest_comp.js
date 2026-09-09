@@ -29,17 +29,18 @@ class ContestComp {
 			this.render();
 			this.load_contest();
 		} else {
-			this.render_error("No contest selected.");
+			this.render_error("No contest selected", "There are currently no contests selected. Please choose a contest from the list.");
 		}
 	}
 
 	handle_route_change(contest_name) {
-		if (!contest_name || contest_name === this.contest_name) {
-			this.load_contest();
+		this.contest_name = contest_name;
+
+		if (!contest_name) {
+			this.render_error("No contest selected", "There are currently no contests selected. Please choose a contest from the list.");
 			return;
 		}
 
-		this.contest_name = contest_name;
 		this.render();
 		this.load_contest();
 	}
@@ -58,6 +59,11 @@ class ContestComp {
 	}
 
 	async load_contest() {
+		if (!this.contest_name) {
+			this.render_error("No contest selected", "There are currently no contests selected. Please choose a contest from the list.");
+			return;
+		}
+
 		try {
 			const [contestRes, progressRes] = await Promise.all([
 				frappe.call({
@@ -75,7 +81,7 @@ class ContestComp {
 			]);
 
 			if (!contestRes.message) {
-				this.render_error("Contest not found.");
+				this.render_error("Contest not found", "The contest you're looking for could not be found.");
 				return;
 			}
 
@@ -84,7 +90,12 @@ class ContestComp {
 			this.render_contest(this.contest, this.progress);
 		} catch (error) {
 			console.error("Failed to load contest:", error);
-			this.render_error("Unable to load contest.");
+			const rawMsg = error?.messages?.join("\n") || error?.message || "";
+			if (rawMsg.toLowerCase().includes("not found")) {
+				this.render_error("Contest not found", "The contest you're looking for could not be found.");
+			} else {
+				this.render_error("Unable to load contest", "Something went wrong while loading the contest. Please try again later.");
+			}
 		}
 	}
 
@@ -292,12 +303,16 @@ class ContestComp {
 			});
 	}
 
-	render_error(message) {
+	render_error(title = "Unable to load contest", message = "") {
+		if (!message && title) {
+			message = title;
+			title = "Unable to load contest";
+		}
 		$(this.wrapper).find(".layout-main-section").html(`
             <div class="contest-comp-page">
                 <div class="contest-error">
                     <div class="error-icon">!</div>
-                    <h2>Unable to load contest</h2>
+                    <h2>${this.escape_html(title)}</h2>
                     <p>${this.escape_html(message)}</p>
                     <button class="contest-back-btn">Back to Contests</button>
                 </div>
