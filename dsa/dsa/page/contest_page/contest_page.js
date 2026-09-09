@@ -1265,26 +1265,38 @@ class ContestPage {
 		$("head").append(`
 <style id="contest-page-styles">
 
-html body {
-    background: #0b0b0b !important;
+/* Theme-aware colors: everything below reads Frappe's theme
+   variables so the page follows whatever light/dark mode the
+   user (or the Frappe desk) is currently set to. */
+
+.contest-page {
+    --accent: #f5a800;
+    --accent-2: #ffcd39;
+    --accent-ink: #1a1400;
+    --accent-soft: rgba(245, 168, 0, 0.13);
+    --accent-soft-strong: rgba(245, 168, 0, 0.22);
+    --green: var(--text-on-green, #1f9d5c);
+    --green-2: #34d180;
+    --green-soft: rgba(31, 157, 92, 0.13);
+    --red: var(--text-on-red, #e6484a);
+    --red-soft: rgba(230, 72, 74, 0.1);
+    --silver: #9aa3ad;
+    --bronze: #c97b3d;
+    --card-shadow: 0 1px 2px rgba(15, 15, 15, 0.04), 0 8px 24px rgba(15, 15, 15, 0.05);
+    --card-shadow-hover: 0 2px 4px rgba(15, 15, 15, 0.06), 0 16px 36px rgba(15, 15, 15, 0.09);
 }
 
 .layout-main-section {
-    background: #0b0b0b !important;
+    background: var(--bg-color) !important;
     border: none !important;
 }
 
 .layout-main-section-wrapper {
-    background: #0b0b0b !important;
+    background: var(--bg-color) !important;
 }
 
 .page-container {
-    background: #0b0b0b !important;
-}
-
-.contest-page {
-    min-height: 100vh;
-    background: #0b0b0b;
+    background: var(--bg-color) !important;
 }
 
 .contest-page {
@@ -1292,42 +1304,64 @@ html body {
     padding: 30px;
     max-width: 1400px;
     margin: 0 auto;
-    background: #0b0b0b;
-    color: #eee;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text-color);
+    font-family: var(--font-stack, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    background:
+        radial-gradient(720px 320px at 12% -8%, var(--accent-soft), transparent 60%),
+        radial-gradient(600px 280px at 100% 0%, var(--green-soft), transparent 55%),
+        var(--bg-color);
 }
 
 .contest-hero {
+    position: relative;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 40px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, #1f1f1f 0%, #151515 100%);
-    border: 1px solid #2e2e2e;
+    padding: 44px 46px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, var(--card-bg) 0%, var(--card-bg) 60%, var(--accent-soft) 160%);
+    border: 1px solid var(--border-color);
     margin-bottom: 35px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.contest-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
+    background-size: 22px 22px;
+    -webkit-mask-image: linear-gradient(155deg, rgba(0,0,0,0.5), transparent 65%);
+    mask-image: linear-gradient(155deg, rgba(0,0,0,0.5), transparent 65%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
 }
 
 .hero-badge {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 5px 12px;
+    padding: 6px 13px;
     border-radius: 20px;
-    background: rgba(255, 193, 7, 0.12);
-    color: #ffc107;
+    background: var(--accent-soft-strong);
+    color: var(--accent);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.8px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 }
 
 .hero-badge-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #ffc107;
+    background: var(--accent);
     animation: pulse-dot 1.8s infinite;
 }
 
@@ -1342,27 +1376,40 @@ html body {
 }
 
 .contest-hero h1 {
-    font-size: 36px;
+    font-size: 38px;
     font-weight: 800;
+    letter-spacing: -0.5px;
     margin: 0 0 10px;
-    color: #fff;
+    background: linear-gradient(90deg, var(--text-color), var(--text-color) 60%, var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .contest-hero p {
-    color: #888;
+    color: var(--text-muted);
     font-size: 15px;
     margin: 0;
     max-width: 600px;
+    line-height: 1.6;
+}
+
+.hero-decoration {
+    position: relative;
+    z-index: 1;
 }
 
 .code-symbol {
-    font-size: 40px;
-    color: #333;
-    font-family: monospace;
+    font-size: 42px;
+    color: var(--accent);
+    font-family: var(--font-stack-monospace, monospace);
     font-weight: 800;
-    border: 2px dashed #2f2f2f;
-    padding: 15px 25px;
-    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    background: var(--control-bg);
+    padding: 18px 28px;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    transform: rotate(-4deg);
 }
 
 .contest-section {
@@ -1383,54 +1430,57 @@ html body {
 }
 
 .section-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 9px;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 16px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.03);
 }
 
 .section-icon.running {
-    background: rgba(40, 199, 111, 0.15);
-    color: #28c76f;
+    background: linear-gradient(155deg, var(--green-soft), transparent);
+    color: var(--green);
 }
 
 .section-icon.upcoming {
-    background: rgba(255, 193, 7, 0.15);
-    color: #ffc107;
+    background: linear-gradient(155deg, var(--accent-soft), transparent);
+    color: var(--accent);
 }
 
 .section-icon.ended {
-    background: rgba(150, 150, 150, 0.15);
-    color: #888;
+    background: var(--control-bg);
+    color: var(--text-muted);
 }
 
 .section-icon.registered {
-    background: rgba(30, 142, 77, 0.2);
-    color: #42b883;
+    background: linear-gradient(155deg, var(--green-soft), transparent);
+    color: var(--green);
 }
 
 .section-heading h2 {
     margin: 0;
     font-size: 20px;
-    color: #fff;
+    color: var(--text-color);
     font-weight: 700;
+    letter-spacing: -0.2px;
 }
 
 .section-heading p {
     margin: 4px 0 0;
     font-size: 13px;
-    color: #666;
+    color: var(--text-muted);
 }
 
 .section-count {
-    font-size: 14px;
-    color: #888;
-    background: #222;
-    border: 1px solid #333;
-    padding: 3px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--control-bg);
+    border: 1px solid var(--border-color);
+    padding: 4px 12px;
     border-radius: 12px;
 }
 
@@ -1441,20 +1491,41 @@ html body {
 }
 
 .contest-card {
-    background: #191919;
-    border: 1px solid #282828;
-    border-radius: 12px;
-    padding: 22px;
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 22px 22px 20px 24px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     display: flex;
     flex-direction: column;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.contest-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--control-bg);
+}
+
+.contest-card.running::before {
+    background: linear-gradient(var(--green), var(--green-2));
+}
+
+.contest-card.upcoming::before {
+    background: linear-gradient(var(--accent), var(--accent-2));
 }
 
 .contest-card:hover {
-    transform: translateY(-3px);
-    border-color: #444;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: var(--card-shadow-hover);
 }
 
 .card-top {
@@ -1481,18 +1552,18 @@ html body {
 }
 
 .contest-status.running {
-    background: rgba(40, 199, 111, 0.15);
-    color: #28c76f;
+    background: var(--green-soft);
+    color: var(--green);
 }
 
 .contest-status.upcoming {
-    background: rgba(255, 193, 7, 0.15);
-    color: #ffc107;
+    background: var(--accent-soft);
+    color: var(--accent);
 }
 
 .contest-status.ended {
-    background: rgba(120, 120, 120, 0.15);
-    color: #888;
+    background: var(--control-bg);
+    color: var(--text-muted);
 }
 
 .status-dot {
@@ -1508,27 +1579,27 @@ html body {
     gap: 4px;
     padding: 4px 8px;
     border-radius: 6px;
-    background: rgba(40, 199, 111, 0.2);
-    color: #28c76f;
+    background: var(--green-soft);
+    color: var(--green);
     font-size: 10px;
     font-weight: 700;
 }
 
 .contest-code {
-    font-family: monospace;
+    font-family: var(--font-stack-monospace, monospace);
     font-size: 11px;
-    color: #666;
+    color: var(--text-muted);
 }
 
 .contest-title {
     font-size: 18px;
     font-weight: 700;
     margin: 0 0 10px;
-    color: #fff;
+    color: var(--text-color);
 }
 
 .contest-description {
-    color: #888;
+    color: var(--text-muted);
     font-size: 13px;
     line-height: 1.5;
     margin: 0 0 18px;
@@ -1544,10 +1615,10 @@ html body {
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-bottom: 16px;
-    background: #141414;
+    background: var(--control-bg);
     padding: 10px 12px;
     border-radius: 8px;
-    border: 1px solid #222;
+    border: 1px solid var(--border-color);
 }
 
 .meta-item {
@@ -1557,14 +1628,14 @@ html body {
 }
 
 .meta-icon {
-    color: #666;
+    color: var(--text-muted);
     font-size: 12px;
 }
 
 .meta-label {
     display: block;
     font-size: 9px;
-    color: #555;
+    color: var(--text-muted);
     font-weight: 700;
     letter-spacing: 0.5px;
     margin-bottom: 2px;
@@ -1572,13 +1643,13 @@ html body {
 
 .meta-value {
     font-size: 11px;
-    color: #ddd;
+    color: var(--text-color);
     font-weight: 600;
 }
 
 .card-divider {
     height: 1px;
-    background: #242424;
+    background: var(--border-color);
     margin-bottom: 14px;
 }
 
@@ -1590,13 +1661,13 @@ html body {
 
 .contest-end {
     font-size: 11px;
-    color: #666;
+    color: var(--text-muted);
 }
 
 .view-contest {
     background: transparent;
     border: 0;
-    color: #ffc107;
+    color: var(--accent);
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
@@ -1621,31 +1692,40 @@ html body {
 }
 
 .back-to-contests {
-    background: #222;
-    border: 1px solid #333;
-    color: #bbb;
-    padding: 8px 16px;
-    border-radius: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 9px 18px;
+    border-radius: 9px;
     cursor: pointer;
     font-size: 13px;
     font-weight: 600;
     margin-bottom: 25px;
     transition: all 0.2s ease;
+    box-shadow: var(--card-shadow);
 }
 
 .back-to-contests:hover {
-    background: #2a2a2a;
-    color: #fff;
+    background: var(--fg-hover-color, var(--control-bg));
+    color: var(--text-color);
+    transform: translateX(-2px);
 }
 
 .details-hero {
-    padding: 35px;
-    border-radius: 14px;
-    background: #1a1a1a;
-    border: 1px solid #303030;
+    position: relative;
+    padding: 38px 42px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, var(--card-bg) 0%, var(--card-bg) 55%, var(--accent-soft) 170%);
+    border: 1px solid var(--border-color);
     margin-bottom: 30px;
     display: flex;
     justify-content: space-between;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.details-hero.running {
+    background: linear-gradient(155deg, var(--card-bg) 0%, var(--card-bg) 55%, var(--green-soft) 170%);
 }
 
 .details-top-row {
@@ -1656,20 +1736,20 @@ html body {
 }
 
 .details-contest-code {
-    font-family: monospace;
+    font-family: var(--font-stack-monospace, monospace);
     font-size: 12px;
-    color: #777;
+    color: var(--text-muted);
 }
 
 .details-hero h1 {
     font-size: 32px;
     font-weight: 800;
-    color: #fff;
+    color: var(--text-color);
     margin: 0 0 12px;
 }
 
 .details-hero p {
-    color: #999;
+    color: var(--text-muted);
     font-size: 14px;
     line-height: 1.6;
     margin: 0 0 25px;
@@ -1684,49 +1764,51 @@ html body {
 
 .contest-join-btn,
 .contest-enter-btn {
-    padding: 12px 28px;
+    padding: 12px 30px;
     border: 0;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
 }
 
 .contest-join-btn {
-    background: #ffc107;
-    color: #111;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink);
 }
 
 .contest-join-btn:hover:not(:disabled) {
-    background: #ffca28;
+    filter: brightness(1.04);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 193, 7, 0.25);
+    box-shadow: 0 10px 24px var(--accent-soft-strong);
 }
 
 .contest-join-btn.disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: #444;
-    color: #aaa;
+    background: var(--control-bg);
+    color: var(--text-muted);
+    box-shadow: none;
 }
 
 .contest-enter-btn {
-    background: #28c76f;
+    background: linear-gradient(135deg, var(--green-2), var(--green));
     color: #fff;
 }
 
 .contest-enter-btn:hover {
-    background: #34d87b;
+    filter: brightness(1.05);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(40, 199, 111, 0.25);
+    box-shadow: 0 10px 24px var(--green-soft);
 }
 
 .contest-leave-btn {
     padding: 11px 20px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-color);
     background: transparent;
-    color: #aaa;
+    color: var(--text-muted);
     border-radius: 8px;
     font-size: 13px;
     font-weight: 600;
@@ -1735,9 +1817,9 @@ html body {
 }
 
 .contest-leave-btn:hover {
-    border-color: #ff4d4f;
-    color: #ff4d4f;
-    background: rgba(255, 77, 79, 0.08);
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-soft);
 }
 
 .details-section {
@@ -1754,21 +1836,21 @@ html body {
 .section-line {
     width: 4px;
     height: 32px;
-    background: #ffc107;
+    background: var(--accent);
     border-radius: 2px;
 }
 
 .details-section-title h2 {
     margin: 0;
     font-size: 18px;
-    color: #fff;
+    color: var(--text-color);
     font-weight: 700;
 }
 
 .details-section-title p {
     margin: 2px 0 0;
     font-size: 12px;
-    color: #666;
+    color: var(--text-muted);
 }
 
 .details-info-grid {
@@ -1778,31 +1860,38 @@ html body {
 }
 
 .info-card {
-    background: #161616;
-    border: 1px solid #282828;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
     padding: 18px;
-    border-radius: 10px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     gap: 14px;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow-hover);
 }
 
 .info-card-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 8px;
-    background: #222;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(155deg, var(--accent-soft), var(--control-bg));
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #ffc107;
+    color: var(--accent);
     font-size: 14px;
 }
 
 .info-label {
     display: block;
     font-size: 10px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 700;
     letter-spacing: 0.6px;
     margin-bottom: 3px;
@@ -1810,32 +1899,33 @@ html body {
 
 .info-card strong {
     font-size: 13px;
-    color: #eee;
+    color: var(--text-color);
 }
 
 .about-card {
-    background: #161616;
-    border: 1px solid #282828;
-    border-radius: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     padding: 22px;
     display: flex;
     gap: 18px;
+    box-shadow: var(--card-shadow);
 }
 
 .about-icon {
-    color: #ffc107;
+    color: var(--accent);
     font-size: 18px;
 }
 
 .contest-description-full {
-    color: #aaa;
+    color: var(--text-color);
     font-size: 13px;
     line-height: 1.7;
 }
 
 .contest-description-full .ql-editor {
     padding: 0;
-    color: #aaa;
+    color: var(--text-color);
     font-size: 13px;
     line-height: 1.7;
 }
@@ -1855,28 +1945,29 @@ html body {
 }
 
 .problem-card {
-    background: #161616;
-    border: 1px solid #282828;
-    border-radius: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     padding: 16px 20px;
     display: flex;
     align-items: center;
     gap: 16px;
     cursor: pointer;
     transition: all 0.2s ease;
+    box-shadow: var(--card-shadow);
 }
 
 .problem-card:hover {
-    border-color: #ffc107;
-    transform: translateX(3px);
-    background: #1c1c1c;
+    border-color: var(--accent);
+    transform: translateX(4px);
+    box-shadow: var(--card-shadow-hover);
 }
 
 .problem-number {
-    font-family: monospace;
+    font-family: var(--font-stack-monospace, monospace);
     font-size: 13px;
     font-weight: 800;
-    color: #ffc107;
+    color: var(--accent);
     width: 32px;
 }
 
@@ -1887,12 +1978,12 @@ html body {
 .problem-title {
     font-size: 14px;
     font-weight: 600;
-    color: #eee;
+    color: var(--text-color);
 }
 
 .problem-meta {
     font-size: 11px;
-    color: #666;
+    color: var(--text-muted);
 }
 
 .problem-points {
@@ -1902,95 +1993,96 @@ html body {
 .points-label {
     display: block;
     font-size: 9px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 700;
 }
 
 .problem-points strong {
-    color: #ffc107;
+    color: var(--accent);
     font-size: 13px;
 }
 
 .problem-arrow {
-    color: #555;
+    color: var(--text-muted);
     font-size: 16px;
 }
 
 .problem-card:hover .problem-arrow {
-    color: #ffc107;
+    color: var(--accent);
 }
 
 .problems-placeholder {
-    background: #151515;
-    border: 1px dashed #303030;
-    border-radius: 10px;
+    background: var(--card-bg);
+    border: 1px dashed var(--border-color);
+    border-radius: 12px;
     padding: 50px;
     text-align: center;
 }
 
 .placeholder-icon {
     font-size: 24px;
-    color: #666;
+    color: var(--text-muted);
     margin-bottom: 12px;
 }
 
 .problems-placeholder h3 {
     margin: 0 0 6px;
-    color: #ddd;
+    color: var(--text-color);
     font-size: 15px;
 }
 
 .problems-placeholder p {
     margin: 0;
-    color: #666;
+    color: var(--text-muted);
     font-size: 12px;
 }
 
 .contest-state {
     text-align: center;
     padding: 80px 20px;
-    background: #151515;
-    border: 1px dashed #303030;
-    border-radius: 12px;
+    background: var(--card-bg);
+    border: 1px dashed var(--border-color);
+    border-radius: 14px;
 }
 
 .state-icon {
     font-size: 28px;
-    color: #666;
+    color: var(--text-muted);
     margin-bottom: 12px;
 }
 
 .state-icon.error {
-    color: #ff4d4f;
+    color: var(--red);
 }
 
 .contest-state h3 {
     margin: 0 0 8px;
-    color: #eee;
+    color: var(--text-color);
     font-size: 18px;
 }
 
 .contest-state p {
     margin: 0 0 16px;
-    color: #777;
+    color: var(--text-muted);
     font-size: 13px;
 }
 
 .contest-retry {
-    background: #ffc107;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
     border: 0;
-    padding: 8px 18px;
-    border-radius: 6px;
+    padding: 9px 20px;
+    border-radius: 8px;
     font-weight: 700;
     cursor: pointer;
-    color: #111;
+    color: var(--accent-ink);
+    box-shadow: 0 6px 16px var(--accent-soft-strong);
 }
 
 .loading-spinner {
     width: 22px;
     height: 22px;
-    border: 2px solid #333;
-    border-top-color: #ffc107;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -2008,7 +2100,7 @@ html body {
     justify-content: center;
     gap: 12px;
     padding: 80px;
-    color: #777;
+    color: var(--text-muted);
     font-size: 13px;
 }
 
@@ -2022,9 +2114,10 @@ html body {
 .leaderboard-table-wrapper {
     width: 100%;
     overflow-x: auto;
-    border: 1px solid rgba(255, 193, 7, 0.12);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow);
 }
 
 .leaderboard-table {
@@ -2040,15 +2133,15 @@ html body {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #888;
-    background: rgba(255, 255, 255, 0.025);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    background: var(--control-bg);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .leaderboard-table td {
     padding: 16px;
-    color: #ddd;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
     font-size: 14px;
 }
 
@@ -2057,7 +2150,7 @@ html body {
 }
 
 .leaderboard-table tbody tr:hover {
-    background: rgba(255, 193, 7, 0.04);
+    background: var(--accent-soft);
 }
 
 .leaderboard-rank {
@@ -2068,18 +2161,34 @@ html body {
     height: 30px;
     padding: 0 8px;
     border-radius: 8px;
-    background: rgba(255, 193, 7, 0.08);
-    color: #ffc107;
+    background: var(--accent-soft);
+    color: var(--accent);
     font-weight: 700;
+}
+
+.leaderboard-table tbody tr:nth-child(1) .leaderboard-rank {
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink);
+    box-shadow: 0 4px 10px var(--accent-soft-strong);
+}
+
+.leaderboard-table tbody tr:nth-child(2) .leaderboard-rank {
+    background: linear-gradient(135deg, #c7ced6, var(--silver));
+    color: #23282e;
+}
+
+.leaderboard-table tbody tr:nth-child(3) .leaderboard-rank {
+    background: linear-gradient(135deg, #dc9b64, var(--bronze));
+    color: #2b1a0c;
 }
 
 .leaderboard-user {
     font-weight: 600;
-    color: #f1f1f1;
+    color: var(--text-color);
 }
 
 .leaderboard-score {
-    color: #ffc107;
+    color: var(--accent);
     font-size: 15px;
 }
 
@@ -2089,14 +2198,14 @@ html body {
     align-items: center;
     justify-content: center;
     gap: 12px;
-    color: #888;
+    color: var(--text-muted);
 }
 
 .leaderboard-loading .loading-spinner {
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(255, 193, 7, 0.2);
-    border-top-color: #ffc107;
+    border: 2px solid var(--accent-soft);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: leaderboard-spin 0.8s linear infinite;
 }
