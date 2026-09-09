@@ -2,39 +2,217 @@
  "actions": [],
  "allow_bulk_edit": 1,
  "allow_rename": 1,
+ "autoname": "field:title",
+ "creation": "2026-08-27 18:18:05.626790",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": ["title", "route_slug", "difficulty", "topics", "description","hint","examples", "constraints", "code_section", "custom_starter_code", "custom_wrapper_code", "python_code_section", "custom_python_starter_code", "custom_python_wrapper_code", "javascript_code_section", "custom_javascript_starter_code", "custom_javascript_wrapper_code", "java_code_section", "custom_java_starter_code", "custom_java_wrapper_code", "test_cases"],
- "fields": [
-  {"fieldname": "title", "fieldtype": "Data", "in_list_view": 1, "label": "Title", "reqd": 1},
-  {"fieldname": "route_slug", "fieldtype": "Data", "label": "Route Slug", "unique": 1, "read_only": 1, "no_copy": 1},
-  {"fieldname": "difficulty", "fieldtype": "Select", "in_list_view": 1, "label": "Difficulty", "options": "easy\nmedium\nhard", "reqd": 1},
-  {"fieldname": "topics", "fieldtype": "Table MultiSelect", "label": "Topics", "options": "DSA Problem Topic"},
-  {"fieldname": "description", "fieldtype": "Text Editor", "label": "Description", "reqd": 1},
-  {"fieldname": "hint", "fieldtype": "Text Editor", "label": "Hint"},
-  {"fieldname": "examples", "fieldtype": "Text Editor", "label": "Examples"},
-  {"fieldname": "constraints", "fieldtype": "Text Editor", "label": "Constraints"},
-  {"fieldname": "code_section", "fieldtype": "Section Break", "label": "Code"},
-  {"fieldname": "custom_starter_code", "fieldtype": "Code", "label": "C++ Starter Code", "options": "C++"},
-  {"description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.", "fieldname": "custom_wrapper_code", "fieldtype": "Code", "label": "C++ Wrapper Code", "options": "C++"},
-  {"fieldname": "python_code_section", "fieldtype": "Section Break", "label": "Python 3 Code"},
-  {"fieldname": "custom_python_starter_code", "fieldtype": "Code", "label": "Python 3 Starter Code", "options": "Python"},
-  {"description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.", "fieldname": "custom_python_wrapper_code", "fieldtype": "Code", "label": "Python 3 Wrapper Code", "options": "Python"},
-  {"fieldname": "javascript_code_section", "fieldtype": "Section Break", "label": "JavaScript Code"},
-  {"fieldname": "custom_javascript_starter_code", "fieldtype": "Code", "label": "JavaScript Starter Code", "options": "JavaScript"},
-  {"description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.", "fieldname": "custom_javascript_wrapper_code", "fieldtype": "Code", "label": "JavaScript Wrapper Code", "options": "JavaScript"},
-  {"fieldname": "java_code_section", "fieldtype": "Section Break", "label": "Java Code"},
-  {"fieldname": "custom_java_starter_code", "fieldtype": "Code", "label": "Java Starter Code", "options": "Java"},
-  {"description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.", "fieldname": "custom_java_wrapper_code", "fieldtype": "Code", "label": "Java Wrapper Code", "options": "Java"},
-  {"fieldname": "test_cases", "fieldtype": "Table", "label": "Test Cases", "options": "TestCase", "reqd": 1}
- ],
+"field_order": [
+    "title",
+    "route_slug",
+    "difficulty",
+    "topics",
+    "description",
+    "hint",
+    "examples",
+    "constraints",
+    "code_section",
+    "custom_starter_code",
+    "custom_wrapper_code",
+    "python_code_section",
+    "custom_python_starter_code",
+    "custom_python_wrapper_code",
+    "javascript_code_section",
+    "custom_javascript_starter_code",
+    "custom_javascript_wrapper_code",
+    "java_code_section",
+    "custom_java_starter_code",
+    "custom_java_wrapper_code",
+    "test_cases",
+    "time_complexity",
+    "space_complexity"
+],
+
+"fields": [
+    {
+        "fieldname": "title",
+        "fieldtype": "Data",
+        "in_list_view": 1,
+        "label": "Title",
+        "reqd": 1,
+        "unique": 1
+    },
+    {
+        "fieldname": "route_slug",
+        "fieldtype": "Data",
+        "label": "Route Slug",
+        "unique": 1,
+        "read_only": 1,
+        "no_copy": 1
+    },
+    {
+        "fieldname": "difficulty",
+        "fieldtype": "Select",
+        "in_list_view": 1,
+        "label": "Difficulty",
+        "options": "easy\nmedium\nhard",
+        "reqd": 1
+    },
+    {
+        "fieldname": "topics",
+        "fieldtype": "Table MultiSelect",
+        "label": "Topics",
+        "options": "DSA Problem Topic"
+    },
+    {
+        "fieldname": "description",
+        "fieldtype": "Text Editor",
+        "label": "Description",
+        "reqd": 1
+    },
+    {
+        "fieldname": "hint",
+        "fieldtype": "Text Editor",
+        "label": "Hint"
+    },
+    {
+        "fieldname": "examples",
+        "fieldtype": "Text Editor",
+        "label": "Examples"
+    },
+    {
+        "fieldname": "constraints",
+        "fieldtype": "Text Editor",
+        "label": "Constraints"
+    },
+    {
+        "fieldname": "code_section",
+        "fieldtype": "Section Break",
+        "label": "Code"
+    },
+    {
+        "fieldname": "custom_starter_code",
+        "fieldtype": "Code",
+        "label": "C++ Starter Code",
+        "options": "C++"
+    },
+    {
+        "description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.",
+        "fieldname": "custom_wrapper_code",
+        "fieldtype": "Code",
+        "label": "C++ Wrapper Code",
+        "options": "C++"
+    },
+    {
+        "fieldname": "python_code_section",
+        "fieldtype": "Section Break",
+        "label": "Python 3 Code"
+    },
+    {
+        "fieldname": "custom_python_starter_code",
+        "fieldtype": "Code",
+        "label": "Python 3 Starter Code",
+        "options": "Python"
+    },
+    {
+        "description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.",
+        "fieldname": "custom_python_wrapper_code",
+        "fieldtype": "Code",
+        "label": "Python 3 Wrapper Code",
+        "options": "Python"
+    },
+    {
+        "fieldname": "javascript_code_section",
+        "fieldtype": "Section Break",
+        "label": "JavaScript Code"
+    },
+    {
+        "fieldname": "custom_javascript_starter_code",
+        "fieldtype": "Code",
+        "label": "JavaScript Starter Code",
+        "options": "JavaScript"
+    },
+    {
+        "description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.",
+        "fieldname": "custom_javascript_wrapper_code",
+        "fieldtype": "Code",
+        "label": "JavaScript Wrapper Code",
+        "options": "JavaScript"
+    },
+    {
+        "fieldname": "java_code_section",
+        "fieldtype": "Section Break",
+        "label": "Java Code"
+    },
+    {
+        "fieldname": "custom_java_starter_code",
+        "fieldtype": "Code",
+        "label": "Java Starter Code",
+        "options": "Java"
+    },
+    {
+        "description": "Hidden runner code. Insert the learner's code with {{USER_CODE}}.",
+        "fieldname": "custom_java_wrapper_code",
+        "fieldtype": "Code",
+        "label": "Java Wrapper Code",
+        "options": "Java"
+    },
+    {
+        "fieldname": "test_cases",
+        "fieldtype": "Table",
+        "label": "Test Cases",
+        "options": "TestCase",
+        "reqd": 1
+    },
+    {
+        "fieldname": "time_complexity",
+        "fieldtype": "Select",
+        "label": "Time Complexity",
+        "options": "O(1)\nO(log n)\nO(n)\nO(n log n)\nO(n²)\nO(n³)\nO(2^n)\nO(n!)"
+    },
+    {
+        "fieldname": "space_complexity",
+        "fieldtype": "Select",
+        "label": "Space Complexity",
+        "options": "O(1)\nO(log n)\nO(n)\nO(n log n)\nO(n²)\nO(n³)\nO(2^n)\nO(n!)"
+    }
+],
  "index_web_pages_for_search": 1,
  "links": [],
+ "modified": "2026-09-04 11:42:51.678554",
+ "modified_by": "Administrator",
  "module": "DSA",
  "name": "DSAProblem",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
  "permissions": [
-  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1}
+    {
+        "create": 1,
+        "delete": 1,
+        "email": 1,
+        "export": 1,
+        "print": 1,
+        "read": 1,
+        "report": 1,
+        "role": "System Manager",
+        "share": 1,
+        "write": 1
+    },
+    {
+        "read": 1,
+        "role": "LMS Student"
+    },
+    {
+        "read": 1,
+        "role": "LMS Instructor"
+    },
+    {
+        "create": 1,
+        "read": 1,
+        "write": 1,
+        "role": "Course Creator"
+    }
  ],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": []

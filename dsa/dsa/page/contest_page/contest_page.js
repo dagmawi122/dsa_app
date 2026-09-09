@@ -105,6 +105,7 @@ class ContestPage {
 			this.render_contests(contests, myContests);
 		} catch (error) {
 			console.error("Failed to load contests:", error);
+
 			$(".contest-content").html(`
                 <div class="contest-state">
                     <div class="state-icon error">!</div>
@@ -113,6 +114,7 @@ class ContestPage {
                     <button class="contest-retry">Try Again</button>
                 </div>
             `);
+
 			$(".contest-retry").on("click", () => this.load_contests());
 		}
 	}
@@ -129,7 +131,9 @@ class ContestPage {
 			return;
 		}
 
-		const registeredNames = new Set(myContests.map((c) => c.contest || c.name));
+		const registeredNames = new Set(
+			myContests.map((c) => c.contest || c.name)
+		);
 
 		const upcoming = contests.filter((c) => c.status === "Upcoming");
 		const running = contests.filter((c) => c.status === "Active");
@@ -147,6 +151,7 @@ class ContestPage {
 					  )
 					: ""
 			}
+
             ${this.render_section(
 				"Running",
 				"Contests happening right now",
@@ -155,6 +160,7 @@ class ContestPage {
 				false,
 				registeredNames
 			)}
+
             ${this.render_section(
 				"Upcoming",
 				"Get ready for the next challenge",
@@ -163,6 +169,7 @@ class ContestPage {
 				false,
 				registeredNames
 			)}
+
             ${this.render_section(
 				"Ended",
 				"Previous competitions",
@@ -193,11 +200,13 @@ class ContestPage {
                         <div class="section-icon ${type}">
                             ${this.get_section_icon(type)}
                         </div>
+
                         <div>
                             <h2>${title}</h2>
                             <p>${subtitle}</p>
                         </div>
                     </div>
+
                     <span class="section-count">${contests.length}</span>
                 </div>
 
@@ -207,7 +216,9 @@ class ContestPage {
 							this.render_card(
 								contest,
 								type,
-								registeredNames.has(contest.name || contest.contest)
+								registeredNames.has(
+									contest.name || contest.contest
+								)
 							)
 						)
 						.join("")}
@@ -218,44 +229,70 @@ class ContestPage {
 
 	render_card(contest, type, isRegistered = false) {
 		const contestName = contest.contest || contest.name;
+
 		const start = this.format_date(contest.start_date);
-		const duration = this.calculate_duration(contest.start_date, contest.end_date);
+
+		const duration = this.calculate_duration(
+			contest.start_date,
+			contest.end_date
+		);
+
 		const problemCount =
 			contest.problem_count !== undefined
 				? contest.problem_count
 				: contest.problems
 				? contest.problems.length
 				: "—";
-		const description =
-			this.strip_html(contest.description) || "Put your problem-solving skills to the test.";
 
-		const cardType = contest.status ? this.get_status_type(contest.status) : type;
+		const description =
+			this.strip_html(contest.description) ||
+			"Put your problem-solving skills to the test.";
+
+		const cardType = contest.status
+			? this.get_status_type(contest.status)
+			: type;
 
 		return `
             <article class="contest-card ${cardType}" data-contest="${this.escape_html(
 			contestName
 		)}">
+
                 <div class="card-top">
                     <div class="card-badges">
+
                         <span class="contest-status ${cardType}">
                             <span class="status-dot"></span>
                             ${this.get_status_label(cardType)}
                         </span>
+
                         ${
 							isRegistered
 								? `<span class="registered-badge"><i class="fa fa-check"></i> Enrolled</span>`
 								: ""
 						}
+
                     </div>
-                    <span class="contest-code">${this.escape_html(contestName)}</span>
+
+                    <span class="contest-code">
+                        ${this.escape_html(contestName)}
+                    </span>
                 </div>
 
-                <h3 class="contest-title">${this.escape_html(contest.title || contestName)}</h3>
-                <p class="contest-description">${this.escape_html(description)}</p>
+                <h3 class="contest-title">
+                    ${this.escape_html(contest.title || contestName)}
+                </h3>
+
+                <p class="contest-description">
+                    ${this.escape_html(description)}
+                </p>
 
                 <div class="contest-meta">
+
                     <div class="meta-item">
-                        <div class="meta-icon"><i class="fa fa-calendar"></i></div>
+                        <div class="meta-icon">
+                            <i class="fa fa-calendar"></i>
+                        </div>
+
                         <div>
                             <span class="meta-label">STARTS</span>
                             <span class="meta-value">${start}</span>
@@ -263,7 +300,10 @@ class ContestPage {
                     </div>
 
                     <div class="meta-item">
-                        <div class="meta-icon"><i class="fa fa-clock-o"></i></div>
+                        <div class="meta-icon">
+                            <i class="fa fa-clock-o"></i>
+                        </div>
+
                         <div>
                             <span class="meta-label">DURATION</span>
                             <span class="meta-value">${duration}</span>
@@ -271,29 +311,44 @@ class ContestPage {
                     </div>
 
                     <div class="meta-item">
-                        <div class="meta-icon"><i class="fa fa-code"></i></div>
+                        <div class="meta-icon">
+                            <i class="fa fa-code"></i>
+                        </div>
+
                         <div>
                             <span class="meta-label">PROBLEMS</span>
                             <span class="meta-value">${problemCount}</span>
                         </div>
                     </div>
+
                 </div>
 
                 <div class="card-divider"></div>
 
                 <div class="card-footer">
+
                     <span class="contest-end">
                         ${
 							cardType === "ended"
-								? `Ended ${this.format_date(contest.end_date)}`
-								: `Ends ${this.format_date(contest.end_date)}`
+								? `Ended ${this.format_date(
+										contest.end_date
+								  )}`
+								: `Ends ${this.format_date(
+										contest.end_date
+								  )}`
 						}
                     </span>
 
-                    <button class="view-contest" data-contest="${this.escape_html(contestName)}">
-                        View Contest <span class="arrow">→</span>
+                    <button
+                        class="view-contest"
+                        data-contest="${this.escape_html(contestName)}"
+                    >
+                        View Contest
+                        <span class="arrow">→</span>
                     </button>
+
                 </div>
+
             </article>
         `;
 	}
@@ -301,13 +356,17 @@ class ContestPage {
 	bind_listing_events() {
 		$(".view-contest").on("click", (event) => {
 			event.stopPropagation();
+
 			const contest_name = $(event.currentTarget).data("contest");
+
 			this.open_contest(contest_name);
 		});
 
 		$(".contest-card").on("click", (event) => {
 			if ($(event.target).closest(".view-contest").length) return;
+
 			const contest_name = $(event.currentTarget).data("contest");
+
 			this.open_contest(contest_name);
 		});
 	}
@@ -324,6 +383,7 @@ class ContestPage {
 		$(this.wrapper).find(".layout-main-section").html(`
             <div class="contest-page">
                 <div class="contest-details-page">
+
                     <button class="back-to-contests">
                         <span>←</span> Back to Contests
                     </button>
@@ -332,6 +392,7 @@ class ContestPage {
                         <div class="loading-spinner"></div>
                         <span>Loading contest...</span>
                     </div>
+
                 </div>
             </div>
         `);
@@ -344,69 +405,104 @@ class ContestPage {
 					method: "dsa.api.get_contest",
 					args: { name: this.contest_name },
 				}),
+
 				frappe
 					.call({
 						method: "dsa.dsa.doctype.contest_registration.contest_registration.get_participant_status",
 						args: { contest: this.contest_name },
 					})
-					.catch(() => ({ message: { registered: false } })),
+					.catch(() => ({
+						message: { registered: false },
+					})),
 			]);
 
 			const contest = contestRes.message;
-			const participantStatus = statusRes.message || { registered: false };
+
+			const participantStatus =
+				statusRes.message || {
+					registered: false,
+				};
 
 			if (!contest) {
 				this.render_not_found();
 				return;
 			}
 
-			this.render_contest_details(contest, participantStatus);
+			this.render_contest_details(
+				contest,
+				participantStatus
+			);
 		} catch (error) {
 			console.error("Failed to load contest:", error);
+
 			this.render_error();
 		}
 	}
 
 	render_contest_details(contest, participantStatus) {
 		const type = this.get_status_type(contest.status);
+
 		const description =
-			this.strip_html(contest.description) || "No description available for this contest.";
-		const duration = this.calculate_duration(contest.start_date, contest.end_date);
+			this.strip_html(contest.description) ||
+			"No description available for this contest.";
+
+		const duration = this.calculate_duration(
+			contest.start_date,
+			contest.end_date
+		);
+
 		const problems = contest.problems || [];
-		const isRegistered = participantStatus && participantStatus.registered;
+
+		const isRegistered =
+			participantStatus &&
+			participantStatus.registered;
+
 		const isEnded = type === "ended";
 
 		let actionButtonsHtml = "";
+
 		if (isRegistered) {
 			actionButtonsHtml = `
                 <div class="contest-actions-wrapper">
-                    <button class="contest-enter-btn" data-contest="${this.escape_html(
-						contest.name
-					)}">
-                        <i class="fa fa-sign-in"></i> Enter Contest
+
+                    <button
+                        class="contest-enter-btn"
+                        data-contest="${this.escape_html(contest.name)}"
+                    >
+                        <i class="fa fa-sign-in"></i>
+                        Enter Contest
                     </button>
+
                     ${
 						!isEnded
 							? `
-                    <button class="contest-leave-btn" data-contest="${this.escape_html(
-						contest.name
-					)}">
+                    <button
+                        class="contest-leave-btn"
+                        data-contest="${this.escape_html(contest.name)}"
+                    >
                         Leave Contest
                     </button>
                     `
 							: ""
 					}
+
                 </div>
             `;
 		} else if (isEnded) {
 			actionButtonsHtml = `
-                <button class="contest-join-btn disabled" disabled>
+                <button
+                    class="contest-join-btn disabled"
+                    disabled
+                >
                     Contest Ended
                 </button>
             `;
 		} else {
 			actionButtonsHtml = `
-                <button class="contest-join-btn" data-contest="${this.escape_html(contest.name)}">
+                <button
+                    class="contest-join-btn"
+                    data-contest="${this.escape_html(contest.name)}"
+                >
                     Join Contest
                 </button>
             `;
@@ -414,66 +510,104 @@ class ContestPage {
 
 		$(".contest-details-page").html(`
             <!-- BACK -->
+
             <button class="back-to-contests">
                 <span>←</span> Back to Contests
             </button>
 
             <!-- HERO -->
+
             <div class="details-hero ${type}">
+
                 <div class="details-hero-content">
+
                     <div class="details-top-row">
+
                         <span class="contest-status ${type}">
                             <span class="status-dot"></span>
                             ${this.get_status_label(type)}
                         </span>
+
                         ${
 							isRegistered
 								? `<span class="registered-badge"><i class="fa fa-check"></i> Enrolled</span>`
 								: ""
 						}
-                        <span class="details-contest-code">${this.escape_html(contest.name)}</span>
+
+                        <span class="details-contest-code">
+                            ${this.escape_html(contest.name)}
+                        </span>
+
                     </div>
 
-                    <h1>${this.escape_html(contest.title)}</h1>
-                    <p>${this.escape_html(description)}</p>
+                    <h1>
+                        ${this.escape_html(contest.title)}
+                    </h1>
+
+                    <p>
+                        ${this.escape_html(description)}
+                    </p>
 
                     ${actionButtonsHtml}
+
                 </div>
 
                 <div class="details-hero-decoration">
                     <span>{ }</span>
                 </div>
+
             </div>
 
             <!-- INFORMATION -->
+
             <section class="details-section">
+
                 <div class="details-section-title">
+
                     <span class="section-line"></span>
+
                     <div>
                         <h2>Contest Information</h2>
-                        <p>Everything you need to know about this contest.</p>
+                        <p>
+                            Everything you need to know about this contest.
+                        </p>
                     </div>
+
                 </div>
 
                 <div class="details-info-grid">
+
                     <div class="info-card">
-                        <div class="info-card-icon"><i class="fa fa-play"></i></div>
+                        <div class="info-card-icon">
+                            <i class="fa fa-play"></i>
+                        </div>
+
                         <div>
                             <span class="info-label">STARTS</span>
-                            <strong>${this.format_date(contest.start_date)}</strong>
+                            <strong>
+                                ${this.format_date(contest.start_date)}
+                            </strong>
                         </div>
                     </div>
 
                     <div class="info-card">
-                        <div class="info-card-icon"><i class="fa fa-stop"></i></div>
+                        <div class="info-card-icon">
+                            <i class="fa fa-stop"></i>
+                        </div>
+
                         <div>
                             <span class="info-label">ENDS</span>
-                            <strong>${this.format_date(contest.end_date)}</strong>
+                            <strong>
+                                ${this.format_date(contest.end_date)}
+                            </strong>
                         </div>
                     </div>
 
                     <div class="info-card">
-                        <div class="info-card-icon"><i class="fa fa-clock-o"></i></div>
+                        <div class="info-card-icon">
+                            <i class="fa fa-clock-o"></i>
+                        </div>
+
                         <div>
                             <span class="info-label">DURATION</span>
                             <strong>${duration}</strong>
@@ -481,28 +615,45 @@ class ContestPage {
                     </div>
 
                     <div class="info-card">
-                        <div class="info-card-icon"><i class="fa fa-code"></i></div>
+                        <div class="info-card-icon">
+                            <i class="fa fa-code"></i>
+                        </div>
+
                         <div>
                             <span class="info-label">PROBLEMS</span>
                             <strong>${problems.length}</strong>
                         </div>
                     </div>
+
                 </div>
+
             </section>
 
             <!-- ABOUT -->
+
             <section class="details-section">
+
                 <div class="details-section-title">
+
                     <span class="section-line"></span>
+
                     <div>
                         <h2>About This Contest</h2>
-                        <p>Overview and rules for participants.</p>
+                        <p>
+                            Overview and rules for participants.
+                        </p>
                     </div>
+
                 </div>
 
                 <div class="about-card">
-                    <div class="about-icon"><i class="fa fa-info-circle"></i></div>
+
+                    <div class="about-icon">
+                        <i class="fa fa-info-circle"></i>
+                    </div>
+
                     <div class="about-content">
+
                         <div class="contest-description-full">
                             ${
 								contest.description
@@ -510,80 +661,152 @@ class ContestPage {
 									: "<p>No additional instructions provided.</p>"
 							}
                         </div>
+
                     </div>
+
                 </div>
+
             </section>
 
             <!-- PROBLEMS -->
+
             <section class="details-section">
+
                 <div class="details-section-title">
+
                     <span class="section-line"></span>
+
                     <div>
                         <h2>Contest Problems</h2>
-                        <p>Challenges prepared for this contest.</p>
+                        <p>
+                            Challenges prepared for this contest.
+                        </p>
                     </div>
+
                 </div>
 
                 ${
 					problems.length
 						? `
                     <div class="contest-problems">
+
                         ${problems
 							.map(
 								(p, idx) => `
-                            <div class="problem-card" data-problem="${this.escape_html(
-								p.problem
-							)}">
-                                <div class="problem-number">${String(idx + 1).padStart(
-									2,
-									"0"
-								)}</div>
+                            <div
+                                class="problem-card"
+                                data-problem="${this.escape_html(
+									p.problem
+								)}"
+                            >
+
+                                <div class="problem-number">
+                                    ${String(idx + 1).padStart(
+										2,
+										"0"
+									)}
+                                </div>
+
                                 <div class="problem-main">
-                                    <div class="problem-title">${this.escape_html(p.problem)}</div>
-                                    <div class="problem-meta">Order: ${p.order || idx + 1}</div>
+
+                                    <div class="problem-title">
+                                        ${this.escape_html(
+											p.title || p.problem
+										)}
+                                    </div>
+
+                                    <div class="problem-meta">
+                                        Order:
+                                        ${p.order || idx + 1}
+                                    </div>
+
                                 </div>
+
                                 <div class="problem-points">
-                                    <span class="points-label">POINTS</span>
-                                    <strong>${p.points || 0}</strong>
+
+                                    <span class="points-label">
+                                        POINTS
+                                    </span>
+
+                                    <strong>
+                                        ${p.points || 0}
+                                    </strong>
+
                                 </div>
-                                <div class="problem-arrow">→</div>
+
+                                <div class="problem-arrow">
+                                    →
+                                </div>
+
                             </div>
                         `
 							)
 							.join("")}
+
                     </div>
                 `
 						: `
                     <div class="problems-placeholder">
-                        <div class="placeholder-icon"><i class="fa fa-lock"></i></div>
-                        <h3>Problems hidden or not published</h3>
-                        <p>Contest problems will appear here once published.</p>
+
+                        <div class="placeholder-icon">
+                            <i class="fa fa-lock"></i>
+                        </div>
+
+                        <h3>
+                            Problems hidden or not published
+                        </h3>
+
+                        <p>
+                            Contest problems will appear here once published.
+                        </p>
+
                     </div>
                 `
 				}
+
             </section>
 
             <!-- LEADERBOARD -->
+
             <section class="details-section">
+
                 <div class="details-section-title">
+
                     <span class="section-line"></span>
+
                     <div>
                         <h2>Leaderboard</h2>
-                        <p>See how participants are performing in this contest.</p>
+
+                        <p>
+                            See how participants are performing in this contest.
+                        </p>
                     </div>
+
                 </div>
 
                 <div class="contest-leaderboard">
+
                     <div class="leaderboard-loading">
+
                         <div class="loading-spinner"></div>
-                        <span>Loading leaderboard...</span>
+
+                        <span>
+                            Loading leaderboard...
+                        </span>
+
                     </div>
+
                 </div>
+
             </section>
         `);
 
 		this.load_leaderboard();
-		this.bind_details_events(contest, isRegistered);
+
+		this.bind_details_events(
+			contest,
+			isRegistered
+		);
 	}
 
 	bind_details_events(contest, isRegistered) {
@@ -592,68 +815,122 @@ class ContestPage {
 		});
 
 		$(".contest-enter-btn").on("click", () => {
-			frappe.set_route("contest-comp", this.contest_name);
+			frappe.set_route(
+				"contest-comp",
+				this.contest_name
+			);
 		});
 
 		$(".problem-card").on("click", () => {
 			if (isRegistered) {
-				frappe.set_route("contest-comp", this.contest_name);
+				frappe.set_route(
+					"contest-comp",
+					this.contest_name
+				);
 			} else {
 				frappe.msgprint({
 					title: __("Registration Required"),
-					message: __("Please join this contest first to access the challenges."),
+					message: __(
+						"Please join this contest first to access the challenges."
+					),
 					indicator: "orange",
 				});
 			}
 		});
 
-		$(".contest-join-btn:not(.disabled)").on("click", async (event) => {
-			const btn = $(event.currentTarget);
-			btn.prop("disabled", true).text("Joining...");
+		$(".contest-join-btn:not(.disabled)").on(
+			"click",
+			async (event) => {
+				const btn = $(event.currentTarget);
 
-			try {
-				const res = await frappe.call({
-					method: "dsa.dsa.doctype.contest_registration.contest_registration.join_contest",
-					args: { contest: this.contest_name },
-				});
+				btn.prop("disabled", true).text("Joining...");
 
-				frappe.show_alert({
-					message: res.message?.message || __("Successfully joined the contest!"),
-					indicator: "green",
-				});
-
-				frappe.set_route("contest-comp", this.contest_name);
-			} catch (err) {
-				btn.prop("disabled", false).text("Join Contest");
-				const msg = err?.messages
-					? err.messages.join(" ")
-					: err?.message || __("Could not join contest.");
-				frappe.show_alert({ message: msg, indicator: "red" });
-			}
-		});
-
-		$(".contest-leave-btn").on("click", async () => {
-			frappe.confirm(__("Are you sure you want to leave this contest?"), async () => {
 				try {
 					const res = await frappe.call({
-						method: "dsa.dsa.doctype.contest_registration.contest_registration.leave_contest",
-						args: { contest: this.contest_name },
+						method:
+							"dsa.dsa.doctype.contest_registration.contest_registration.join_contest",
+						args: {
+							contest: this.contest_name,
+						},
 					});
 
 					frappe.show_alert({
-						message: res.message?.message || __("You have left the contest."),
-						indicator: "orange",
+						message:
+							res.message?.message ||
+							__(
+								"Successfully joined the contest!"
+							),
+						indicator: "green",
 					});
 
-					this.load_contest();
+					frappe.set_route(
+						"contest-comp",
+						this.contest_name
+					);
 				} catch (err) {
+					btn.prop("disabled", false).text(
+						"Join Contest"
+					);
+
 					const msg = err?.messages
 						? err.messages.join(" ")
-						: err?.message || __("Could not leave contest.");
-					frappe.show_alert({ message: msg, indicator: "red" });
+						: err?.message ||
+						  __("Could not join contest.");
+
+					frappe.show_alert({
+						message: msg,
+						indicator: "red",
+					});
 				}
-			});
-		});
+			}
+		);
+
+		$(".contest-leave-btn").on(
+			"click",
+			async () => {
+				frappe.confirm(
+					__(
+						"Are you sure you want to leave this contest?"
+					),
+					async () => {
+						try {
+							const res =
+								await frappe.call({
+									method:
+										"dsa.dsa.doctype.contest_registration.contest_registration.leave_contest",
+									args: {
+										contest: this
+											.contest_name,
+									},
+								});
+
+							frappe.show_alert({
+								message:
+									res.message?.message ||
+									__(
+										"You have left the contest."
+									),
+								indicator: "orange",
+							});
+
+							this.load_contest();
+						} catch (err) {
+							const msg = err?.messages
+								? err.messages.join(" ")
+								: err?.message ||
+								  __(
+										"Could not leave contest."
+								  );
+
+							frappe.show_alert({
+								message: msg,
+								indicator: "red",
+							});
+						}
+					}
+				);
+			}
+		);
 	}
 
 	async load_leaderboard() {
@@ -665,17 +942,31 @@ class ContestPage {
 				},
 			});
 
-			const leaderboard = res.message?.leaderboard || [];
+			const leaderboard =
+				res.message?.leaderboard || [];
 
 			this.render_leaderboard(leaderboard);
 		} catch (error) {
-			console.error("Failed to load leaderboard:", error);
+			console.error(
+				"Failed to load leaderboard:",
+				error
+			);
 
 			$(".contest-leaderboard").html(`
                 <div class="contest-state">
-                    <div class="state-icon error">!</div>
-                    <h3>Unable to load leaderboard</h3>
-                    <p>Something went wrong while loading the leaderboard.</p>
+
+                    <div class="state-icon error">
+                        !
+                    </div>
+
+                    <h3>
+                        Unable to load leaderboard
+                    </h3>
+
+                    <p>
+                        Something went wrong while loading the leaderboard.
+                    </p>
+
                 </div>
             `);
 		}
@@ -685,18 +976,59 @@ class ContestPage {
 		if (!leaderboard.length) {
 			$(".contest-leaderboard").html(`
                 <div class="problems-placeholder">
-                    <div class="placeholder-icon">🏆</div>
-                    <h3>No participants yet</h3>
-                    <p>The leaderboard will appear once participants join the contest.</p>
+
+                    <div class="placeholder-icon">
+                        🏆
+                    </div>
+
+                    <h3>
+                        No participants yet
+                    </h3>
+
+                    <p>
+                        The leaderboard will appear once participants join the contest.
+                    </p>
+
                 </div>
             `);
+
 			return;
 		}
 
+		const format_solving_time = (seconds) => {
+			const total_seconds = Number(
+				seconds || 0
+			);
+
+			const hours = Math.floor(
+				total_seconds / 3600
+			);
+
+			const minutes = Math.floor(
+				(total_seconds % 3600) / 60
+			);
+
+			const remaining_seconds =
+				total_seconds % 60;
+
+			if (hours > 0) {
+				return `${hours}h ${minutes}m ${remaining_seconds}s`;
+			}
+
+			if (minutes > 0) {
+				return `${minutes}m ${remaining_seconds}s`;
+			}
+
+			return `${remaining_seconds}s`;
+		};
+
 		$(".contest-leaderboard").html(`
             <div class="leaderboard-table-wrapper">
+
                 <table class="leaderboard-table">
+
                     <thead>
+
                         <tr>
                             <th>Rank</th>
                             <th>Participant</th>
@@ -705,13 +1037,16 @@ class ContestPage {
                             <th>Submissions</th>
                             <th>Time</th>
                         </tr>
+
                     </thead>
 
                     <tbody>
+
                         ${leaderboard
 							.map(
 								(row) => `
                             <tr>
+
                                 <td>
                                     <span class="leaderboard-rank">
                                         #${row.rank}
@@ -720,7 +1055,10 @@ class ContestPage {
 
                                 <td>
                                     <div class="leaderboard-user">
-                                        ${this.escape_html(row.full_name || row.member)}
+                                        ${this.escape_html(
+											row.full_name ||
+												row.member
+										)}
                                     </div>
                                 </td>
 
@@ -739,42 +1077,89 @@ class ContestPage {
                                 </td>
 
                                 <td>
-                                    ${row.time ? this.format_date(row.time) : "—"}
+                                    ${format_solving_time(
+										row.total_solving_time
+									)}
                                 </td>
+
                             </tr>
                         `
 							)
 							.join("")}
+
                     </tbody>
+
                 </table>
+
             </div>
         `);
 	}
 
 	render_not_found() {
 		$(".contest-details-page").html(`
-            <button class="back-to-contests"><span>←</span> Back to Contests</button>
+            <button class="back-to-contests">
+                <span>←</span> Back to Contests
+            </button>
+
             <div class="contest-state">
-                <div class="state-icon">?</div>
-                <h3>Contest not found</h3>
-                <p>The requested contest could not be found or has been removed.</p>
+
+                <div class="state-icon">
+                    ?
+                </div>
+
+                <h3>
+                    Contest not found
+                </h3>
+
+                <p>
+                    The requested contest could not be found or has been removed.
+                </p>
+
             </div>
         `);
-		$(".back-to-contests").on("click", () => frappe.set_route("contest-page"));
+
+		$(".back-to-contests").on(
+			"click",
+			() => frappe.set_route("contest-page")
+		);
 	}
 
 	render_error() {
 		$(".contest-details-page").html(`
-            <button class="back-to-contests"><span>←</span> Back to Contests</button>
+            <button class="back-to-contests">
+                <span>←</span> Back to Contests
+            </button>
+
             <div class="contest-state">
-                <div class="state-icon error">!</div>
-                <h3>Failed to load contest</h3>
-                <p>Could not retrieve contest details.</p>
-                <button class="contest-retry">Retry</button>
+
+                <div class="state-icon error">
+                    !
+                </div>
+
+                <h3>
+                    Failed to load contest
+                </h3>
+
+                <p>
+                    Could not retrieve contest details.
+                </p>
+
+                <button class="contest-retry">
+                    Retry
+                </button>
+
             </div>
         `);
-		$(".back-to-contests").on("click", () => frappe.set_route("contest-page"));
-		$(".contest-retry").on("click", () => this.load_contest());
+
+		$(".back-to-contests").on(
+			"click",
+			() => frappe.set_route("contest-page")
+		);
+
+		$(".contest-retry").on(
+			"click",
+			() => this.load_contest()
+		);
 	}
 
 	/* =========================================================
@@ -783,8 +1168,10 @@ class ContestPage {
 
 	get_status_type(status) {
 		const s = (status || "").toLowerCase();
+
 		if (s === "active") return "running";
 		if (s === "upcoming") return "upcoming";
+
 		return "ended";
 	}
 
@@ -792,6 +1179,7 @@ class ContestPage {
 		if (type === "running") return "Running";
 		if (type === "upcoming") return "Upcoming";
 		if (type === "registered") return "Enrolled";
+
 		return "Ended";
 	}
 
@@ -799,13 +1187,17 @@ class ContestPage {
 		if (type === "running") return "▶";
 		if (type === "upcoming") return "⏰";
 		if (type === "registered") return "★";
+
 		return "✓";
 	}
 
 	format_date(dateStr) {
 		if (!dateStr) return "—";
+
 		try {
-			return frappe.datetime.str_to_user(dateStr);
+			return frappe.datetime.str_to_user(
+				dateStr
+			);
 		} catch {
 			return dateStr;
 		}
@@ -813,20 +1205,39 @@ class ContestPage {
 
 	calculate_duration(startDate, endDate) {
 		if (!startDate || !endDate) return "—";
+
 		try {
 			const start = new Date(startDate);
 			const end = new Date(endDate);
+
 			const diffMs = end - start;
+
 			if (diffMs <= 0) return "—";
 
-			const diffMins = Math.floor(diffMs / (1000 * 60));
-			const hours = Math.floor(diffMins / 60);
+			const diffMins = Math.floor(
+				diffMs / (1000 * 60)
+			);
+
+			const hours = Math.floor(
+				diffMins / 60
+			);
+
 			const mins = diffMins % 60;
-			const days = Math.floor(hours / 24);
+
+			const days = Math.floor(
+				hours / 24
+			);
+
 			const remHours = hours % 24;
 
-			if (days > 0) return `${days}d ${remHours}h`;
-			if (hours > 0) return `${hours}h ${mins}m`;
+			if (days > 0) {
+				return `${days}d ${remHours}h`;
+			}
+
+			if (hours > 0) {
+				return `${hours}h ${mins}m`;
+			}
+
 			return `${mins}m`;
 		} catch {
 			return "—";
@@ -835,11 +1246,17 @@ class ContestPage {
 
 	strip_html(html) {
 		if (!html) return "";
-		return $("<div>").html(html).text().trim();
+
+		return $("<div>")
+			.html(html)
+			.text()
+			.trim();
 	}
 
 	escape_html(str) {
-		return frappe.utils.escape_html(str || "");
+		return frappe.utils.escape_html(
+			str || ""
+		);
 	}
 
 	add_styles() {
@@ -847,109 +1264,848 @@ class ContestPage {
 
 		$("head").append(`
 <style id="contest-page-styles">
-.contest-page { padding: 30px; max-width: 1400px; margin: 0 auto; color: #eee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-.contest-hero { display: flex; justify-content: space-between; align-items: center; padding: 40px; border-radius: 14px; background: linear-gradient(135deg, #1f1f1f 0%, #151515 100%); border: 1px solid #2e2e2e; margin-bottom: 35px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }
-.hero-badge { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 20px; background: rgba(255, 193, 7, 0.12); color: #ffc107; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 12px; }
-.hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #ffc107; animation: pulse-dot 1.8s infinite; }
-@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-.contest-hero h1 { font-size: 36px; font-weight: 800; margin: 0 0 10px; color: #fff; }
-.contest-hero p { color: #888; font-size: 15px; margin: 0; max-width: 600px; }
-.code-symbol { font-size: 40px; color: #333; font-family: monospace; font-weight: 800; border: 2px dashed #2f2f2f; padding: 15px 25px; border-radius: 12px; }
-.contest-section { margin-bottom: 40px; }
-.section-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.section-title-wrapper { display: flex; align-items: center; gap: 14px; }
-.section-icon { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-.section-icon.running { background: rgba(40, 199, 111, 0.15); color: #28c76f; }
-.section-icon.upcoming { background: rgba(255, 193, 7, 0.15); color: #ffc107; }
-.section-icon.ended { background: rgba(150, 150, 150, 0.15); color: #888; }
-.section-icon.registered { background: rgba(30, 142, 77, 0.2); color: #42b883; }
-.section-heading h2 { margin: 0; font-size: 20px; color: #fff; font-weight: 700; }
-.section-heading p { margin: 4px 0 0; font-size: 13px; color: #666; }
-.section-count { font-size: 14px; color: #888; background: #222; border: 1px solid #333; padding: 3px 10px; border-radius: 12px; }
-.contest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
-.contest-card { background: #191919; border: 1px solid #282828; border-radius: 12px; padding: 22px; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; }
-.contest-card:hover { transform: translateY(-3px); border-color: #444; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
-.card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.card-badges { display: flex; align-items: center; gap: 8px; }
-.contest-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
-.contest-status.running { background: rgba(40, 199, 111, 0.15); color: #28c76f; }
-.contest-status.upcoming { background: rgba(255, 193, 7, 0.15); color: #ffc107; }
-.contest-status.ended { background: rgba(120, 120, 120, 0.15); color: #888; }
-.status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.registered-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; background: rgba(40, 199, 111, 0.2); color: #28c76f; font-size: 10px; font-weight: 700; }
-.contest-code { font-family: monospace; font-size: 11px; color: #666; }
-.contest-title { font-size: 18px; font-weight: 700; margin: 0 0 10px; color: #fff; }
-.contest-description { color: #888; font-size: 13px; line-height: 1.5; margin: 0 0 18px; flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.contest-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; background: #141414; padding: 10px 12px; border-radius: 8px; border: 1px solid #222; }
-.meta-item { display: flex; align-items: center; gap: 8px; }
-.meta-icon { color: #666; font-size: 12px; }
-.meta-label { display: block; font-size: 9px; color: #555; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 2px; }
-.meta-value { font-size: 11px; color: #ddd; font-weight: 600; }
-.card-divider { height: 1px; background: #242424; margin-bottom: 14px; }
-.card-footer { display: flex; justify-content: space-between; align-items: center; }
-.contest-end { font-size: 11px; color: #666; }
-.view-contest { background: transparent; border: 0; color: #ffc107; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-.view-contest:hover .arrow { transform: translateX(3px); }
-.arrow { transition: transform 0.2s ease; }
+
+/* Theme-aware colors: everything below reads Frappe's theme
+   variables so the page follows whatever light/dark mode the
+   user (or the Frappe desk) is currently set to. */
+
+.contest-page {
+    --accent: #f5a800;
+    --accent-2: #ffcd39;
+    --accent-ink: #1a1400;
+    --accent-soft: rgba(245, 168, 0, 0.13);
+    --accent-soft-strong: rgba(245, 168, 0, 0.22);
+    --green: var(--text-on-green, #1f9d5c);
+    --green-2: #34d180;
+    --green-soft: rgba(31, 157, 92, 0.13);
+    --red: var(--text-on-red, #e6484a);
+    --red-soft: rgba(230, 72, 74, 0.1);
+    --silver: #9aa3ad;
+    --bronze: #c97b3d;
+    --card-shadow: 0 1px 2px rgba(15, 15, 15, 0.04), 0 8px 24px rgba(15, 15, 15, 0.05);
+    --card-shadow-hover: 0 2px 4px rgba(15, 15, 15, 0.06), 0 16px 36px rgba(15, 15, 15, 0.09);
+}
+
+.layout-main-section {
+    background: var(--bg-color) !important;
+    border: none !important;
+}
+
+.layout-main-section-wrapper {
+    background: var(--bg-color) !important;
+}
+
+.page-container {
+    background: var(--bg-color) !important;
+}
+
+.contest-page {
+    min-height: 100vh;
+    padding: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+    color: var(--text-color);
+    font-family: var(--font-stack, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    background:
+        radial-gradient(720px 320px at 12% -8%, var(--accent-soft), transparent 60%),
+        radial-gradient(600px 280px at 100% 0%, var(--green-soft), transparent 55%),
+        var(--bg-color);
+}
+
+.contest-hero {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 44px 46px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, var(--card-bg) 0%, var(--card-bg) 60%, var(--accent-soft) 160%);
+    border: 1px solid var(--border-color);
+    margin-bottom: 35px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.contest-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
+    background-size: 22px 22px;
+    -webkit-mask-image: linear-gradient(155deg, rgba(0,0,0,0.5), transparent 65%);
+    mask-image: linear-gradient(155deg, rgba(0,0,0,0.5), transparent 65%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 13px;
+    border-radius: 20px;
+    background: var(--accent-soft-strong);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    margin-bottom: 14px;
+}
+
+.hero-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse-dot 1.8s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+.contest-hero h1 {
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin: 0 0 10px;
+    background: linear-gradient(90deg, var(--text-color), var(--text-color) 60%, var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.contest-hero p {
+    color: var(--text-muted);
+    font-size: 15px;
+    margin: 0;
+    max-width: 600px;
+    line-height: 1.6;
+}
+
+.hero-decoration {
+    position: relative;
+    z-index: 1;
+}
+
+.code-symbol {
+    font-size: 42px;
+    color: var(--accent);
+    font-family: var(--font-stack-monospace, monospace);
+    font-weight: 800;
+    border: 2px solid var(--border-color);
+    background: var(--control-bg);
+    padding: 18px 28px;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    transform: rotate(-4deg);
+}
+
+.contest-section {
+    margin-bottom: 40px;
+}
+
+.section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.section-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.section-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.03);
+}
+
+.section-icon.running {
+    background: linear-gradient(155deg, var(--green-soft), transparent);
+    color: var(--green);
+}
+
+.section-icon.upcoming {
+    background: linear-gradient(155deg, var(--accent-soft), transparent);
+    color: var(--accent);
+}
+
+.section-icon.ended {
+    background: var(--control-bg);
+    color: var(--text-muted);
+}
+
+.section-icon.registered {
+    background: linear-gradient(155deg, var(--green-soft), transparent);
+    color: var(--green);
+}
+
+.section-heading h2 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--text-color);
+    font-weight: 700;
+    letter-spacing: -0.2px;
+}
+
+.section-heading p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.section-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--control-bg);
+    border: 1px solid var(--border-color);
+    padding: 4px 12px;
+    border-radius: 12px;
+}
+
+.contest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.contest-card {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 22px 22px 20px 24px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.contest-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--control-bg);
+}
+
+.contest-card.running::before {
+    background: linear-gradient(var(--green), var(--green-2));
+}
+
+.contest-card.upcoming::before {
+    background: linear-gradient(var(--accent), var(--accent-2));
+}
+
+.contest-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.card-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.contest-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.contest-status.running {
+    background: var(--green-soft);
+    color: var(--green);
+}
+
+.contest-status.upcoming {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.contest-status.ended {
+    background: var(--control-bg);
+    color: var(--text-muted);
+}
+
+.status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.registered-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--green-soft);
+    color: var(--green);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.contest-code {
+    font-family: var(--font-stack-monospace, monospace);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.contest-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 10px;
+    color: var(--text-color);
+}
+
+.contest-description {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 18px;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.contest-meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+    background: var(--control-bg);
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meta-icon {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.meta-label {
+    display: block;
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.meta-value {
+    font-size: 11px;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.card-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin-bottom: 14px;
+}
+
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.contest-end {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.view-contest {
+    background: transparent;
+    border: 0;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.view-contest:hover .arrow {
+    transform: translateX(3px);
+}
+
+.arrow {
+    transition: transform 0.2s ease;
+}
 
 /* DETAILS */
-.contest-details-page { max-width: 1000px; margin: 0 auto; }
-.back-to-contests { background: #222; border: 1px solid #333; color: #bbb; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; margin-bottom: 25px; transition: all 0.2s ease; }
-.back-to-contests:hover { background: #2a2a2a; color: #fff; }
-.details-hero { padding: 35px; border-radius: 14px; background: #1a1a1a; border: 1px solid #303030; margin-bottom: 30px; display: flex; justify-content: space-between; }
-.details-top-row { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
-.details-contest-code { font-family: monospace; font-size: 12px; color: #777; }
-.details-hero h1 { font-size: 32px; font-weight: 800; color: #fff; margin: 0 0 12px; }
-.details-hero p { color: #999; font-size: 14px; line-height: 1.6; margin: 0 0 25px; max-width: 700px; }
-.contest-actions-wrapper { display: flex; align-items: center; gap: 14px; }
-.contest-join-btn, .contest-enter-btn { padding: 12px 28px; border: 0; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
-.contest-join-btn { background: #ffc107; color: #111; }
-.contest-join-btn:hover:not(:disabled) { background: #ffca28; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255, 193, 7, 0.25); }
-.contest-join-btn.disabled { opacity: 0.5; cursor: not-allowed; background: #444; color: #aaa; }
-.contest-enter-btn { background: #28c76f; color: #fff; }
-.contest-enter-btn:hover { background: #34d87b; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(40, 199, 111, 0.25); }
-.contest-leave-btn { padding: 11px 20px; border: 1px solid #444; background: transparent; color: #aaa; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
-.contest-leave-btn:hover { border-color: #ff4d4f; color: #ff4d4f; background: rgba(255, 77, 79, 0.08); }
-.details-section { margin-bottom: 35px; }
-.details-section-title { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-.section-line { width: 4px; height: 32px; background: #ffc107; border-radius: 2px; }
-.details-section-title h2 { margin: 0; font-size: 18px; color: #fff; font-weight: 700; }
-.details-section-title p { margin: 2px 0 0; font-size: 12px; color: #666; }
-.details-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.info-card { background: #161616; border: 1px solid #282828; padding: 18px; border-radius: 10px; display: flex; align-items: center; gap: 14px; }
-.info-card-icon { width: 38px; height: 38px; border-radius: 8px; background: #222; display: flex; align-items: center; justify-content: center; color: #ffc107; font-size: 14px; }
-.info-label { display: block; font-size: 10px; color: #666; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 3px; }
-.info-card strong { font-size: 13px; color: #eee; }
-.about-card { background: #161616; border: 1px solid #282828; border-radius: 10px; padding: 22px; display: flex; gap: 18px; }
-.about-icon { color: #ffc107; font-size: 18px; }
-.contest-description-full { color: #aaa; font-size: 13px; line-height: 1.7; }
-.contest-problems { display: flex; flex-direction: column; gap: 10px; }
-.problem-card { background: #161616; border: 1px solid #282828; border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s ease; }
-.problem-card:hover { border-color: #ffc107; transform: translateX(3px); background: #1c1c1c; }
-.problem-number { font-family: monospace; font-size: 13px; font-weight: 800; color: #ffc107; width: 32px; }
-.problem-main { flex: 1; }
-.problem-title { font-size: 14px; font-weight: 600; color: #eee; }
-.problem-meta { font-size: 11px; color: #666; }
-.problem-points { text-align: right; }
-.points-label { display: block; font-size: 9px; color: #666; font-weight: 700; }
-.problem-points strong { color: #ffc107; font-size: 13px; }
-.problem-arrow { color: #555; font-size: 16px; }
-.problem-card:hover .problem-arrow { color: #ffc107; }
-.problems-placeholder { background: #151515; border: 1px dashed #303030; border-radius: 10px; padding: 50px; text-align: center; }
-.placeholder-icon { font-size: 24px; color: #666; margin-bottom: 12px; }
-.problems-placeholder h3 { margin: 0 0 6px; color: #ddd; font-size: 15px; }
-.problems-placeholder p { margin: 0; color: #666; font-size: 12px; }
-.contest-state { text-align: center; padding: 80px 20px; background: #151515; border: 1px dashed #303030; border-radius: 12px; }
-.state-icon { font-size: 28px; color: #666; margin-bottom: 12px; }
-.state-icon.error { color: #ff4d4f; }
-.contest-state h3 { margin: 0 0 8px; color: #eee; font-size: 18px; }
-.contest-state p { margin: 0 0 16px; color: #777; font-size: 13px; }
-.contest-retry { background: #ffc107; border: 0; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; color: #111; }
-.loading-spinner { width: 22px; height: 22px; border: 2px solid #333; border-top-color: #ffc107; border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.contest-loading, .details-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 80px; color: #777; font-size: 13px; }
-@media (max-width: 900px) { .details-info-grid { grid-template-columns: repeat(2, 1fr); } .contest-grid { grid-template-columns: 1fr; } }
-@media (max-width: 600px) { .details-info-grid { grid-template-columns: 1fr; } .contest-hero { padding: 25px; flex-direction: column; } .hero-decoration { display: none; } }
+
+.contest-details-page {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.back-to-contests {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 9px 18px;
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 25px;
+    transition: all 0.2s ease;
+    box-shadow: var(--card-shadow);
+}
+
+.back-to-contests:hover {
+    background: var(--fg-hover-color, var(--control-bg));
+    color: var(--text-color);
+    transform: translateX(-2px);
+}
+
+.details-hero {
+    position: relative;
+    padding: 38px 42px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, var(--card-bg) 0%, var(--card-bg) 55%, var(--accent-soft) 170%);
+    border: 1px solid var(--border-color);
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.details-hero.running {
+    background: linear-gradient(155deg, var(--card-bg) 0%, var(--card-bg) 55%, var(--green-soft) 170%);
+}
+
+.details-top-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.details-contest-code {
+    font-family: var(--font-stack-monospace, monospace);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.details-hero h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text-color);
+    margin: 0 0 12px;
+}
+
+.details-hero p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 25px;
+    max-width: 700px;
+}
+
+.contest-actions-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.contest-join-btn,
+.contest-enter-btn {
+    padding: 12px 30px;
+    border: 0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
+
+.contest-join-btn {
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink);
+}
+
+.contest-join-btn:hover:not(:disabled) {
+    filter: brightness(1.04);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px var(--accent-soft-strong);
+}
+
+.contest-join-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--control-bg);
+    color: var(--text-muted);
+    box-shadow: none;
+}
+
+.contest-enter-btn {
+    background: linear-gradient(135deg, var(--green-2), var(--green));
+    color: #fff;
+}
+
+.contest-enter-btn:hover {
+    filter: brightness(1.05);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px var(--green-soft);
+}
+
+.contest-leave-btn {
+    padding: 11px 20px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.contest-leave-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-soft);
+}
+
+.details-section {
+    margin-bottom: 35px;
+}
+
+.details-section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.section-line {
+    width: 4px;
+    height: 32px;
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+.details-section-title h2 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--text-color);
+    font-weight: 700;
+}
+
+.details-section-title p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.details-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+}
+
+.info-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 18px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.info-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(155deg, var(--accent-soft), var(--control-bg));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-size: 14px;
+}
+
+.info-label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    margin-bottom: 3px;
+}
+
+.info-card strong {
+    font-size: 13px;
+    color: var(--text-color);
+}
+
+.about-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 22px;
+    display: flex;
+    gap: 18px;
+    box-shadow: var(--card-shadow);
+}
+
+.about-icon {
+    color: var(--accent);
+    font-size: 18px;
+}
+
+.contest-description-full {
+    color: var(--text-color);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.contest-description-full .ql-editor {
+    padding: 0;
+    color: var(--text-color);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.contest-description-full p {
+    margin: 0 0 10px;
+}
+
+.contest-description-full p:last-child {
+    margin-bottom: 0;
+}
+
+.contest-problems {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.problem-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--card-shadow);
+}
+
+.problem-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.problem-number {
+    font-family: var(--font-stack-monospace, monospace);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+    width: 32px;
+}
+
+.problem-main {
+    flex: 1;
+}
+
+.problem-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.problem-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.problem-points {
+    text-align: right;
+}
+
+.points-label {
+    display: block;
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.problem-points strong {
+    color: var(--accent);
+    font-size: 13px;
+}
+
+.problem-arrow {
+    color: var(--text-muted);
+    font-size: 16px;
+}
+
+.problem-card:hover .problem-arrow {
+    color: var(--accent);
+}
+
+.problems-placeholder {
+    background: var(--card-bg);
+    border: 1px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 50px;
+    text-align: center;
+}
+
+.placeholder-icon {
+    font-size: 24px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.problems-placeholder h3 {
+    margin: 0 0 6px;
+    color: var(--text-color);
+    font-size: 15px;
+}
+
+.problems-placeholder p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.contest-state {
+    text-align: center;
+    padding: 80px 20px;
+    background: var(--card-bg);
+    border: 1px dashed var(--border-color);
+    border-radius: 14px;
+}
+
+.state-icon {
+    font-size: 28px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.state-icon.error {
+    color: var(--red);
+}
+
+.contest-state h3 {
+    margin: 0 0 8px;
+    color: var(--text-color);
+    font-size: 18px;
+}
+
+.contest-state p {
+    margin: 0 0 16px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.contest-retry {
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    border: 0;
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--accent-ink);
+    box-shadow: 0 6px 16px var(--accent-soft-strong);
+}
+
+.loading-spinner {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.contest-loading,
+.details-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 80px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* LEADERBOARD */
+
 .contest-leaderboard {
     width: 100%;
     overflow-x: auto;
@@ -958,9 +2114,10 @@ class ContestPage {
 .leaderboard-table-wrapper {
     width: 100%;
     overflow-x: auto;
-    border: 1px solid rgba(255, 193, 7, 0.12);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow);
 }
 
 .leaderboard-table {
@@ -976,15 +2133,15 @@ class ContestPage {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #888;
-    background: rgba(255, 255, 255, 0.025);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    background: var(--control-bg);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .leaderboard-table td {
     padding: 16px;
-    color: #ddd;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
     font-size: 14px;
 }
 
@@ -993,7 +2150,7 @@ class ContestPage {
 }
 
 .leaderboard-table tbody tr:hover {
-    background: rgba(255, 193, 7, 0.04);
+    background: var(--accent-soft);
 }
 
 .leaderboard-rank {
@@ -1004,18 +2161,34 @@ class ContestPage {
     height: 30px;
     padding: 0 8px;
     border-radius: 8px;
-    background: rgba(255, 193, 7, 0.08);
-    color: #ffc107;
+    background: var(--accent-soft);
+    color: var(--accent);
     font-weight: 700;
+}
+
+.leaderboard-table tbody tr:nth-child(1) .leaderboard-rank {
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: var(--accent-ink);
+    box-shadow: 0 4px 10px var(--accent-soft-strong);
+}
+
+.leaderboard-table tbody tr:nth-child(2) .leaderboard-rank {
+    background: linear-gradient(135deg, #c7ced6, var(--silver));
+    color: #23282e;
+}
+
+.leaderboard-table tbody tr:nth-child(3) .leaderboard-rank {
+    background: linear-gradient(135deg, #dc9b64, var(--bronze));
+    color: #2b1a0c;
 }
 
 .leaderboard-user {
     font-weight: 600;
-    color: #f1f1f1;
+    color: var(--text-color);
 }
 
 .leaderboard-score {
-    color: #ffc107;
+    color: var(--accent);
     font-size: 15px;
 }
 
@@ -1025,14 +2198,14 @@ class ContestPage {
     align-items: center;
     justify-content: center;
     gap: 12px;
-    color: #888;
+    color: var(--text-muted);
 }
 
 .leaderboard-loading .loading-spinner {
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(255, 193, 7, 0.2);
-    border-top-color: #ffc107;
+    border: 2px solid var(--accent-soft);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: leaderboard-spin 0.8s linear infinite;
 }
@@ -1042,6 +2215,32 @@ class ContestPage {
         transform: rotate(360deg);
     }
 }
+
+@media (max-width: 900px) {
+    .details-info-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .contest-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .details-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .contest-hero {
+        padding: 25px;
+        flex-direction: column;
+    }
+
+    .hero-decoration {
+        display: none;
+    }
+}
+
 </style>
         `);
 	}
