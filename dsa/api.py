@@ -195,11 +195,21 @@ def get_problems() -> list[dict[str, Any]]:
 @frappe.whitelist()
 def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, Any]:
 	_require_login()
-	if slug:
-		name = frappe.db.get_value("DSAProblem", {"route_slug": slug}, "name")
-	if not name:
-		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
-	return _problem_payload(frappe.get_doc("DSAProblem", name))
+	problem_name = None
+	if name:
+		if frappe.db.exists("DSAProblem", name):
+			problem_name = name
+		else:
+			problem_name = frappe.db.get_value("DSAProblem", {"route_slug": name}, "name")
+	elif slug:
+		if frappe.db.exists("DSAProblem", slug):
+			problem_name = slug
+		else:
+			problem_name = frappe.db.get_value("DSAProblem", {"route_slug": slug}, "name")
+
+	if not problem_name:
+		frappe.throw(_("The problem you're looking for could not be found."), frappe.DoesNotExistError)
+	return _problem_payload(frappe.get_doc("DSAProblem", problem_name))
 
 
 def _contest_payload(contest, current_time=None, include_problems=False) -> dict[str, Any]:
@@ -249,9 +259,12 @@ def get_contests(limit_start: int = 0, limit_page_length: int = 20) -> list[dict
 
 
 @frappe.whitelist()
-def get_contest(name: str) -> dict[str, Any]:
+def get_contest(name: str | None = None) -> dict[str, Any]:
 	"""Fetch one contest with its problems."""
 	_require_login()
+
+	if not name or not frappe.db.exists("Contest", name):
+		frappe.throw(_("The contest you're looking for could not be found."), frappe.DoesNotExistError)
 
 	contest = frappe.get_doc("Contest", name)
 
@@ -918,7 +931,7 @@ def get_contest_score(
 
 @frappe.whitelist()
 def get_contest_progress(
-	contest: str,
+	contest: str | None = None,
 ) -> dict[str, Any]:
 	"""Return the signed-in user's progress in a contest."""
 
@@ -1540,6 +1553,46 @@ def get_submission_result(submission: str) -> dict[str, Any]:
 		frappe.throw(_("You cannot view this submission."), frappe.PermissionError)
 	return _refresh_submission(doc)
 
+
+@frappe.whitelist()
+def get_completed_problems() -> list[str]:
+	"""Return distinct problem names/slugs that the signed-in user has solved (Accepted)."""
+	user = _require_login()
+
+	dsa_subs = frappe.get_all(
+		"DSA Submission",
+		filters={"member": user, "status": "Accepted"},
+		fields=["problem"],
+		distinct=True,
+	)
+
+	contest_subs = frappe.get_all(
+		"Contest Submission",
+		filters={"member": user, "status": "Accepted"},
+		fields=["problem"],
+		distinct=True,
+	)
+
+	solved_names = list({s.problem for s in (dsa_subs + contest_subs) if s.problem})
+	if not solved_names:
+		return []
+
+	slug_map = {}
+	problems = frappe.get_all(
+		"DSAProblem",
+		filters={"name": ["in", solved_names]},
+		fields=["name", "route_slug"],
+	)
+	for p in problems:
+		if p.route_slug:
+			slug_map[p.name] = p.route_slug
+
+	completed = set(solved_names)
+	for name in solved_names:
+		if name in slug_map:
+			completed.add(slug_map[name])
+
+	return list(completed)
 def _estimate_time_complexity(code: str) -> str:
     code = re.sub(r"//.*", "", code)
     code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)

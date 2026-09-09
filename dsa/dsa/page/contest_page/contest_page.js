@@ -125,7 +125,7 @@ class ContestPage {
                 <div class="contest-state">
                     <div class="state-icon">☰</div>
                     <h3>No contests available</h3>
-                    <p>Check back later for upcoming competitions.</p>
+                    <p>There are currently no contests available. Please check back later.</p>
                 </div>
             `);
 			return;

@@ -102,6 +102,16 @@ class ContestProblemPage {
 		const currentContest = route[1];
 		const currentProblem = route[2];
 
+		if (!currentContest) {
+			frappe.set_route("contest-page");
+			return;
+		}
+
+		if (!currentProblem) {
+			frappe.set_route("contest-comp", currentContest);
+			return;
+		}
+
 		if (
 			currentProblem &&
 			(currentProblem !== this.problemName || currentContest !== this.contestName)

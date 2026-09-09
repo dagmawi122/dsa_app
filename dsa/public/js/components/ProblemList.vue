@@ -162,11 +162,11 @@
 					<tbody>
 						<tr v-for="(item, index) in filteredProblems" :key="item.name">
 							<td>
-								<a :href="problemUrl(item)" class="problem-title"
+								<a :href="problemUrl(item)" class="problem-title" @click.prevent="openProblem(item)"
 									><span class="problem-number">{{
 										String(index + 1).padStart(2, "0")
 									}}</span
-									><span>{{ item.title }}</span></a
+									><span v-if="isCompleted(item)" class="completed-check" title="Completed">✓</span><span>{{ item.title }}</span></a
 								>
 							</td>
 							<td>
@@ -195,6 +195,7 @@
 									:href="problemUrl(item)"
 									class="open-problem"
 									:aria-label="__('Solve') + ' ' + item.title"
+									@click.prevent="openProblem(item)"
 									><span>{{ __("Solve") }}</span
 									><span aria-hidden="true">↗</span></a
 								>
@@ -216,6 +217,7 @@ import { computed, onMounted, ref, watch } from "vue";
 
 const __ = window.__;
 const loading = ref(true);
+const completedProblems = ref([]);
 const error = ref("");
 let fetching = false;
 const allProblems = ref([]);
@@ -277,14 +279,27 @@ function closeTopicPicker(event) {
 	event.currentTarget.open = false;
 	event.currentTarget.querySelector("summary").focus();
 }
+function isCompleted(item) {
+	return completedProblems.value.includes(item.name) || (item.route_slug && completedProblems.value.includes(item.route_slug));
+}
+
+function openProblem(item) {
+	frappe.set_route("dsa-practice", item.route_slug || item.name);
+}
+
 async function refresh() {
 	applyTopicFromRoute();
-	if (fetching) return;
 	fetching = true;
 	error.value = "";
 	try {
-		const response = await frappe.call({ method: "dsa.api.get_problems" });
+		const [response, completedRes] = await Promise.all([
+			frappe.call({ method: "dsa.api.get_problems" }),
+			frappe.session.user !== "Guest"
+				? frappe.call({ method: "dsa.api.get_completed_problems" }).catch(() => ({ message: [] }))
+				: Promise.resolve({ message: [] }),
+		]);
 		allProblems.value = response.message || [];
+		completedProblems.value = completedRes.message || [];
 	} catch (err) {
 		error.value = __("Could not load problems.");
 	} finally {
@@ -596,6 +611,11 @@ defineExpose({ refresh });
 .problem-title:hover {
 	color: var(--text-color);
 	text-decoration: none;
+}
+.completed-check {
+	color: #28c76f;
+	font-weight: 700;
+	margin-right: 4px;
 }
 .problem-number {
 	color: var(--text-muted);

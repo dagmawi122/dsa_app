@@ -1,53 +1,54 @@
 frappe.pages["contest-comp"].on_page_load = function (wrapper) {
-	new ContestComp(wrapper);
+    new ContestComp(wrapper);
 };
 
 frappe.pages["contest-comp"].on_page_show = function (wrapper) {
-	const route = frappe.get_route();
-	const contest_name = route[1];
+    const route = frappe.get_route();
+    const contest_name = route[1];
 
-	if (wrapper.contest_comp_instance) {
-		wrapper.contest_comp_instance.handle_route_change(contest_name);
-	}
+    if (wrapper.contest_comp_instance) {
+        wrapper.contest_comp_instance.handle_route_change(contest_name);
+    }
 };
 
 class ContestComp {
-	constructor(wrapper) {
-		this.wrapper = wrapper;
-		wrapper.contest_comp_instance = this;
+    constructor(wrapper) {
+        this.wrapper = wrapper;
+        wrapper.contest_comp_instance = this;
 
-		this.page = frappe.ui.make_app_page({
-			parent: wrapper,
-			title: "Contest",
-			single_column: true,
-		});
+        this.page = frappe.ui.make_app_page({
+            parent: wrapper,
+            title: "Contest",
+            single_column: true,
+        });
 
-		this.contest_name = frappe.get_route()[1];
-		this.add_styles();
+        this.contest_name = frappe.get_route()[1];
+        this.add_styles();
 
-		if (this.contest_name) {
-			this.render();
-			this.load_contest();
-		} else {
-			this.render_error("No contest selected.");
-		}
-	}
+        if (this.contest_name) {
+            this.render();
+            this.load_contest();
+        } else {
+            this.render_error("No contest selected", "There are currently no contests selected. Please choose a contest from the list.");
+        }
+    }
 
-	handle_route_change(contest_name) {
-		if (!contest_name || contest_name === this.contest_name) {
-			this.load_contest();
-			return;
-		}
+    handle_route_change(contest_name) {
+        this.contest_name = contest_name;
 
-		this.contest_name = contest_name;
-		this.render();
-		this.load_contest();
-	}
+        if (!contest_name) {
+            this.render_error("No contest selected", "There are currently no contests selected. Please choose a contest from the list.");
+            return;
+        }
 
-	render() {
-		$(this.wrapper).find(".contest-comp-page").remove();
+        this.render();
+        this.load_contest();
+    }
 
-		$(this.wrapper).find(".layout-main-section").html(`
+    render() {
+        $(this.wrapper).find(".contest-comp-page").remove();
+
+        $(this.wrapper).find(".layout-main-section").html(`
             <div class="contest-comp-page">
                 <div class="contest-comp-loading">
                     <div class="loading-spinner"></div>
@@ -55,67 +56,77 @@ class ContestComp {
                 </div>
             </div>
         `);
-	}
+    }
 
-	async load_contest() {
-		try {
-			const [contestRes, progressRes] = await Promise.all([
-				frappe.call({
-					method: "dsa.api.get_contest",
-					args: { name: this.contest_name },
-				}),
-				frappe.session.user !== "Guest"
-					? frappe
-							.call({
-								method: "dsa.api.get_contest_progress",
-								args: { contest: this.contest_name },
-							})
-							.catch(() => ({ message: null }))
-					: Promise.resolve({ message: null }),
-			]);
+    async load_contest() {
+        if (!this.contest_name) {
+            this.render_error("No contest selected", "There are currently no contests selected. Please choose a contest from the list.");
+            return;
+        }
 
-			if (!contestRes.message) {
-				this.render_error("Contest not found.");
-				return;
-			}
+        try {
+            const [contestRes, progressRes] = await Promise.all([
+                frappe.call({
+                    method: "dsa.api.get_contest",
+                    args: { name: this.contest_name },
+                }),
+                frappe.session.user !== "Guest"
+                    ? frappe
+                        .call({
+                            method: "dsa.api.get_contest_progress",
+                            args: { contest: this.contest_name },
+                        })
+                        .catch(() => ({ message: null }))
+                    : Promise.resolve({ message: null }),
+            ]);
 
-			this.contest = contestRes.message;
-			this.progress = progressRes?.message || null;
-			this.render_contest(this.contest, this.progress);
-		} catch (error) {
-			console.error("Failed to load contest:", error);
-			this.render_error("Unable to load contest.");
-		}
-	}
+            if (!contestRes.message) {
+                this.render_error("Contest not found", "The contest you're looking for could not be found.");
+                return;
+            }
 
-	render_contest(contest, progress) {
-		const status = contest.status || "Upcoming";
-		const type = this.status_class(status);
-		const problems = contest.problems || [];
+            this.contest = contestRes.message;
+            this.progress = progressRes?.message || null;
+            this.render_contest(this.contest, this.progress);
+        } catch (error) {
+            console.error("Failed to load contest:", error);
+            const rawMsg = error?.messages?.join("\n") || error?.message || "";
+            if (rawMsg.toLowerCase().includes("not found")) {
+                this.render_error("Contest not found", "The contest you're looking for could not be found.");
+            } else {
+                this.render_error("Unable to load contest", "Something went wrong while loading the contest. Please try again later.");
+            }
+        }
+    }
 
-		const startDate = contest.start_date
-			? frappe.datetime.str_to_user(contest.start_date)
-			: "—";
+    render_contest(contest, progress) {
+        const status = contest.status || "Upcoming";
+        const type = this.status_class(status);
+        const problems = contest.problems || [];
 
-		const endDate = contest.end_date
-			? frappe.datetime.str_to_user(contest.end_date)
-			: "—";
+        const startDate = contest.start_date
+            ? frappe.datetime.str_to_user(contest.start_date)
+            : "—";
 
-		const totalPoints = problems.reduce(
-			(total, problem) => total + (Number(problem.points) || 0),
-			0
-		);
+        const endDate = contest.end_date
+            ? frappe.datetime.str_to_user(contest.end_date)
+            : "—";
 
-		const myScore = progress ? progress.total_score || 0 : 0;
-		const solvedCount = progress ? progress.solved_count || 0 : 0;
-		const progressPct = problems.length
-			? Math.round((solvedCount / problems.length) * 100)
-			: 0;
+        const totalPoints = problems.reduce(
+            (total, problem) => total + (Number(problem.points) || 0),
+            0
+        );
 
-		const solvedSet = new Set(progress?.solved || []);
-		const attemptedSet = new Set(progress?.attempted || []);
+        const myScore = progress ? progress.total_score || 0 : 0;
+        const solvedCount = progress ? progress.solved_count || 0 : 0;
+        const progressPct = problems.length
+            ? Math.round((solvedCount / problems.length) * 100)
+            : 0;
 
-		$(this.wrapper).find(".contest-comp-page").html(`
+        const solvedSet = new Set(progress?.solved || []);
+        const attemptedSet = new Set(progress?.attempted || []);
+
+        $(this.wrapper).find(".contest-comp-page").html(`
             <!-- HERO -->
             <section class="comp-hero ${type}">
                 <div class="comp-hero-content">
@@ -217,22 +228,21 @@ class ContestComp {
                 </div>
 
                 <div class="comp-problem-list">
-                    ${
-						problems.length
-							? problems
-									.sort(
-										(a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)
-									)
-									.map((problem, index) =>
-										this.render_problem(
-											problem,
-											index,
-											solvedSet.has(problem.problem),
-											attemptedSet.has(problem.problem)
-										)
-									)
-									.join("")
-							: `
+                    ${problems.length
+                ? problems
+                    .sort(
+                        (a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)
+                    )
+                    .map((problem, index) =>
+                        this.render_problem(
+                            problem,
+                            index,
+                            solvedSet.has(problem.problem),
+                            attemptedSet.has(problem.problem)
+                        )
+                    )
+                    .join("")
+                : `
                                 <div class="comp-empty-state">
                                     <div class="placeholder-icon">
                                         <i class="fa fa-inbox"></i>
@@ -241,30 +251,29 @@ class ContestComp {
                                     <p>Problems for this contest haven't been added yet.</p>
                                 </div>
                             `
-					}
+            }
                 </div>
             </section>
         `);
 
-		this.bind_events();
-	}
+        this.bind_events();
+    }
 
-	render_problem(problem, index, isSolved, isAttempted) {
-		const number = String(index + 1).padStart(2, "0");
-		const points = Number(problem.points) || 0;
+    render_problem(problem, index, isSolved, isAttempted) {
+        const number = String(index + 1).padStart(2, "0");
+        const points = Number(problem.points) || 0;
 
-		let statusPill = `<span class="problem-status-pill unsolved"><i class="fa fa-circle-o"></i> Unsolved</span>`;
+        let statusPill = `<span class="problem-status-pill unsolved"><i class="fa fa-circle-o"></i> Unsolved</span>`;
 
-		if (isSolved) {
-			statusPill = `<span class="problem-status-pill solved"><i class="fa fa-check"></i> Solved</span>`;
-		} else if (isAttempted) {
-			statusPill = `<span class="problem-status-pill attempted"><i class="fa fa-clock-o"></i> Attempted</span>`;
-		}
+        if (isSolved) {
+            statusPill = `<span class="problem-status-pill solved"><i class="fa fa-check"></i> Solved</span>`;
+        } else if (isAttempted) {
+            statusPill = `<span class="problem-status-pill attempted"><i class="fa fa-clock-o"></i> Attempted</span>`;
+        }
 
-		return `
-            <div class="comp-problem-card ${
-				isSolved ? "is-solved" : ""
-			}" data-problem="${this.escape_html(problem.problem)}">
+        return `
+            <div class="comp-problem-card ${isSolved ? "is-solved" : ""
+            }" data-problem="${this.escape_html(problem.problem)}">
                 <div class="comp-problem-number">
                     ${isSolved ? `<i class="fa fa-check"></i>` : number}
                 </div>
@@ -292,72 +301,73 @@ class ContestComp {
                 </div>
             </div>
         `;
-	}
+    }
 
-	bind_events() {
-		$(".comp-back-btn")
-			.off("click")
-			.on("click", () => {
-				frappe.set_route("contest-page", this.contest_name);
-			});
+    bind_events() {
+        $(".comp-back-btn")
+            .off("click")
+            .on("click", () => {
+                frappe.set_route("contest-page", this.contest_name);
+            });
 
-		$(".comp-problem-card")
-			.off("click")
-			.on("click", (event) => {
-				const problem = $(event.currentTarget).data("problem");
+        $(".comp-problem-card")
+            .off("click")
+            .on("click", (event) => {
+                const problem = $(event.currentTarget).data("problem");
 
-				if (!problem) return;
+                if (!problem) return;
 
-				frappe.set_route("contest-solve", this.contest_name, problem);
-			});
-	}
+                frappe.set_route("contest-solve", this.contest_name, problem);
+            });
+    }
 
-	render_error(message) {
-		$(this.wrapper).find(".layout-main-section").html(`
-            <div class="contest-comp-page">
-                <button class="comp-back-btn standalone">
-                    <span>←</span> Back to Contests
-                </button>
-
-                <div class="comp-state">
-                    <div class="state-icon error">
-                        <i class="fa fa-exclamation-triangle"></i>
-                    </div>
-                    <h2>Unable to load contest</h2>
+    render_error(title = "Unable to load contest", message = "") {
+        if (!message && title) {
+            message = title;
+            title = "Unable to load contest";
+        }
+        $(this.wrapper).find(".layout-main-section").html(`
+           <div class="contest-comp-page">
+         <button class="comp-back-btn standalone">
+        <span>←</span> Back to Contests
+          </button>
+                <div class="contest-error">
+                    <div class="error-icon">!</div>
+                    <h2>${this.escape_html(title)}</h2>
                     <p>${this.escape_html(message)}</p>
                 </div>
             </div>
         `);
 
-		$(".comp-back-btn").on("click", () => {
-			frappe.set_route("contest-page");
-		});
-	}
+        $(".comp-back-btn").on("click", () => {
+            frappe.set_route("contest-page");
+        });
+    }
 
-	status_class(status) {
-		const s = (status || "").toLowerCase();
+    status_class(status) {
+        const s = (status || "").toLowerCase();
 
-		if (s === "active") return "running";
-		if (s === "upcoming") return "upcoming";
+        if (s === "active") return "running";
+        if (s === "upcoming") return "upcoming";
 
-		return "ended";
-	}
+        return "ended";
+    }
 
-	get_status_label(type) {
-		if (type === "running") return "Running";
-		if (type === "upcoming") return "Upcoming";
+    get_status_label(type) {
+        if (type === "running") return "Running";
+        if (type === "upcoming") return "Upcoming";
 
-		return "Ended";
-	}
+        return "Ended";
+    }
 
-	escape_html(str) {
-		return frappe.utils.escape_html(str || "");
-	}
+    escape_html(str) {
+        return frappe.utils.escape_html(str || "");
+    }
 
-	add_styles() {
-		if ($("#contest-comp-styles").length) return;
+    add_styles() {
+        if ($("#contest-comp-styles").length) return;
 
-		$("head").append(`
+        $("head").append(`
 <style id="contest-comp-styles">
 
 /* Theme-aware colors: reads Frappe's theme variables so the page
@@ -981,5 +991,5 @@ class ContestComp {
 
 </style>
         `);
-	}
+    }
 }
