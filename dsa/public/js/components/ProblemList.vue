@@ -240,7 +240,7 @@ const filteredProblems = computed(() =>
 );
 const difficultyCount = (level) =>
 	allProblems.value.filter((item) => item.difficulty === level).length;
-const problemUrl = (item) => "/app/dsa-practice/" + encodeURIComponent(item.route_slug);
+const problemUrl = (item) => "/dsa-practice/" + encodeURIComponent(item.route_slug);
 function applyTopicFromRoute() {
 	const params = new URLSearchParams(window.location.search);
 	if (!params.has("topic")) return;

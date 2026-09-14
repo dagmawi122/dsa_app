@@ -1,51 +1,24 @@
-frappe.pages["contest-comp"].on_page_load = function (wrapper) {
-	new ContestComp(wrapper);
-};
 
-frappe.pages["contest-comp"].on_page_show = function (wrapper) {
-	const route = frappe.get_route();
-	const contest_name = route[1];
-
-	if (wrapper.contest_comp_instance) {
-		wrapper.contest_comp_instance.handle_route_change(contest_name);
-	}
-};
-
-// Best-effort cleanup hook. If the Frappe version in use doesn't call
-// on_page_hide, timers are still cleared on every route change/reload
-// so nothing leaks in practice.
-frappe.pages["contest-comp"].on_page_hide = function (wrapper) {
-	if (wrapper.contest_comp_instance) {
-		wrapper.contest_comp_instance.clear_timers();
-	}
-};
 
 class ContestComp {
-	constructor(wrapper) {
-		this.wrapper = wrapper;
-		wrapper.contest_comp_instance = this;
+	constructor(wrapper, contest_name) {
+        this.wrapper = wrapper;
+        this.contest_name = contest_name;
 
-		this.page = frappe.ui.make_app_page({
-			parent: wrapper,
-			title: "Contest",
-			single_column: true,
-		});
+        this.countdown_interval = null;
+        this.refresh_interval = null;
+        this._toast_timer = null;
+        this._leaderboard_esc_handler = null;
 
-		this.contest_name = frappe.get_route()[1];
-		this.countdown_interval = null;
-		this.refresh_interval = null;
-		this._toast_timer = null;
-		this._leaderboard_esc_handler = null;
+        this.add_styles();
 
-		this.add_styles();
-
-		if (this.contest_name) {
-			this.render_skeleton();
-			this.load_contest();
-		} else {
-			this.render_error("No contest selected.", { type: "not-found" });
-		}
-	}
+        if (this.contest_name) {
+            this.render_skeleton();
+            this.load_contest();
+        } else {
+            this.render_error("No contest selected.", { type: "not-found" });
+        }
+    }
 
 	handle_route_change(contest_name) {
 		if (!contest_name || contest_name === this.contest_name) {
@@ -108,7 +81,7 @@ class ContestComp {
 	render_skeleton() {
 		$(this.wrapper).find(".contest-comp-page").remove();
 
-		$(this.wrapper).find(".layout-main-section").html(`
+		$(this.wrapper).html(`
             <div class="contest-comp-page">
                 <div class="comp-skeleton-hero"></div>
 
@@ -251,7 +224,7 @@ class ContestComp {
 			: "";
 
 		$(this.wrapper).find(".contest-comp-page").remove();
-		$(this.wrapper).find(".layout-main-section").html(`
+		$(this.wrapper).html(`
             <div class="contest-comp-page">
                 <!-- HERO -->
                 <section class="comp-hero ${type}">
@@ -468,11 +441,11 @@ class ContestComp {
 
 	bind_events() {
 		$(this.wrapper)
-			.find(".comp-back-btn")
-			.off("click")
-			.on("click", () => {
-				frappe.set_route("contest-page", this.contest_name);
-			});
+        .find(".comp-back-btn")
+        .off("click")
+        .on("click", () => {
+            window.location.href = `/contest-page/${encodeURIComponent(this.contest_name)}`;
+        });
 
 		$(this.wrapper)
 			.find(".comp-leaderboard-btn")
@@ -524,7 +497,8 @@ class ContestComp {
 			return;
 		}
 
-		frappe.set_route("contest-solve", this.contest_name, problem);
+		window.location.href =
+	        `/contest-solve/${encodeURIComponent(this.contest_name)}/${encodeURIComponent(problem)}`;
 	}
 
 	// ---------- LEADERBOARD MODAL ----------
@@ -837,7 +811,7 @@ class ContestComp {
 		const { type = "error", retry = false } = opts;
 		const heading = type === "not-found" ? "Contest not found" : "Unable to load contest";
 
-		$(this.wrapper).find(".layout-main-section").html(`
+		$(this.wrapper).html(`
             <div class="contest-comp-page">
                 <button class="comp-back-btn standalone">
                     <span>←</span> Back to Contests
@@ -2085,3 +2059,6 @@ class ContestComp {
         `);
 	}
 }
+
+
+window.ContestComp = ContestComp;

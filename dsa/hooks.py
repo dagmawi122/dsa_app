@@ -40,6 +40,7 @@ add_to_apps_screen = [
 # web_include_css = "/assets/dsa/css/dsa.css"
 # web_include_js = "/assets/dsa/js/dsa.js"
 
+
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "dsa/public/scss/website"
 
@@ -263,3 +264,26 @@ add_to_apps_screen = [
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
+
+website_route_rules = [
+    {
+        "from_route": "/contest-page/<contest_name>",
+        "to_route": "contest-page",
+    },
+    {
+        "from_route": "/contest-comp/<contest_name>",
+        "to_route": "contest-comp",
+    },
+    {
+        "from_route": "/list-problems",
+        "to_route": "list-problems",
+    },
+    {
+        "from_route": "/dsa-practice/<problem_name>",
+        "to_route": "dsa-practice",
+    },
+    {
+        "from_route": "/contest-solve/<contest_name>/<problem_name>",
+        "to_route": "contest-solve",
+    },
+]

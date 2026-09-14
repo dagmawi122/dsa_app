@@ -1,28 +1,8 @@
-frappe.pages["contest-page"].on_page_load = function (wrapper) {
-	new ContestPage(wrapper);
-};
-
-frappe.pages["contest-page"].on_page_show = function (wrapper) {
-	const route = frappe.get_route();
-	const contest_name = route[1];
-
-	if (wrapper.contest_page_instance) {
-		wrapper.contest_page_instance.handle_route_change(contest_name);
-	}
-};
-
 class ContestPage {
-	constructor(wrapper) {
+	constructor(wrapper, contest_name) {
 		this.wrapper = wrapper;
-		wrapper.contest_page_instance = this;
 
-		this.page = frappe.ui.make_app_page({
-			parent: wrapper,
-			title: "Contests",
-			single_column: true,
-		});
-
-		this.contest_name = frappe.get_route()[1];
+		this.contest_name = contest_name;
 		this.add_styles();
 
 		if (this.contest_name) {
@@ -51,7 +31,7 @@ class ContestPage {
        ========================================================= */
 
 	render_listing() {
-		$(this.wrapper).find(".layout-main-section").html(`
+		$(this.wrapper).html(`
             <div class="contest-page">
                 <div class="contest-hero">
                     <div class="hero-content">
@@ -374,7 +354,7 @@ class ContestPage {
 	}
 
 	open_contest(contest_name) {
-		frappe.set_route("contest-page", contest_name);
+		window.location.href = `/contest-page/${contest_name}`;
 	}
 
 	/* =========================================================
@@ -382,7 +362,7 @@ class ContestPage {
        ========================================================= */
 
 	render_details() {
-		$(this.wrapper).find(".layout-main-section").html(`
+		$(this.wrapper).html(`
             <div class="contest-page">
                 <div class="contest-details-page">
 
@@ -770,39 +750,7 @@ class ContestPage {
 
             </section>
 
-            <!-- LEADERBOARD -->
-
-            <section class="details-section">
-
-                <div class="details-section-title">
-
-                    <span class="section-line"></span>
-
-                    <div>
-                        <h2>Leaderboard</h2>
-
-                        <p>
-                            See how participants are performing in this contest.
-                        </p>
-                    </div>
-
-                </div>
-
-                <div class="contest-leaderboard">
-
-                    <div class="leaderboard-loading">
-
-                        <div class="loading-spinner"></div>
-
-                        <span>
-                            Loading leaderboard...
-                        </span>
-
-                    </div>
-
-                </div>
-
-            </section>
+            
         `);
 
 		this.load_leaderboard();
@@ -815,32 +763,30 @@ class ContestPage {
 
 	bind_details_events(contest, isRegistered) {
 		$(".back-to-contests").on("click", () => {
-			frappe.set_route("contest-page");
+			window.location.href = "/contest-page"
 		});
 
 		$(".contest-enter-btn").on("click", () => {
-			frappe.set_route(
-				"contest-comp",
-				this.contest_name
-			);
-		});
+            window.location.href = `/contest-comp/${encodeURIComponent(
+                this.contest_name
+            )}`;
+        });
 
 		$(".problem-card").on("click", () => {
-			if (isRegistered) {
-				frappe.set_route(
-					"contest-comp",
-					this.contest_name
-				);
-			} else {
-				frappe.msgprint({
-					title: __("Registration Required"),
-					message: __(
-						"Please join this contest first to access the challenges."
-					),
-					indicator: "orange",
-				});
-			}
-		});
+            if (isRegistered) {
+                window.location.href = `/contest-comp/${encodeURIComponent(
+                    this.contest_name
+                )}`;
+            } else {
+                frappe.msgprint({
+                    title: __("Registration Required"),
+                    message: __(
+                        "Please join this contest first to access the challenges."
+                    ),
+                    indicator: "orange",
+                });
+            }
+        });
 
 		$(".contest-join-btn:not(.disabled)").on(
 			"click",
@@ -867,10 +813,9 @@ class ContestPage {
 						indicator: "green",
 					});
 
-					frappe.set_route(
-						"contest-comp",
-						this.contest_name
-					);
+					window.location.href = `/contest-comp/${encodeURIComponent(
+                        this.contest_name
+                    )}`;
 				} catch (err) {
 					btn.prop("disabled", false).text(
 						"Join Contest"
@@ -1124,7 +1069,7 @@ class ContestPage {
 
 		$(".back-to-contests").on(
 			"click",
-			() => frappe.set_route("contest-page")
+			() => window.location.href = "/contest-page"
 		);
 	}
 
@@ -1157,7 +1102,7 @@ class ContestPage {
 
 		$(".back-to-contests").on(
 			"click",
-			() => frappe.set_route("contest-page")
+			() => window.location.href = "/contest-page"
 		);
 
 		$(".contest-retry").on(
@@ -2286,3 +2231,5 @@ class ContestPage {
         `);
 	}
 }
+
+window.ContestPage = ContestPage;

@@ -1,0 +1,27 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+
+<style>
+    body.dsa-standalone-website .navbar,
+    body.dsa-standalone-website footer {
+        display: none !important;
+    }
+
+    body.dsa-standalone-website .container {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    body.dsa-standalone-website .page_content {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    body.dsa-standalone-website #contest-solve-root {
+        width: 100%;
+        max-width: 100%;
+    }
+</style>
+<div id="contest-comp-root"></div>
+{% endblock %}

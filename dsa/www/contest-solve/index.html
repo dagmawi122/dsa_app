@@ -1,0 +1,49 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+
+<style>
+    body.contest-solve-website .container {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    body.contest-solve-website .page_content {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    body.contest-solve-website #contest-solve-root {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    
+</style>
+
+<style>
+    body.dsa-standalone-website .navbar,
+    body.dsa-standalone-website footer {
+        display: none !important;
+    }
+
+    body.dsa-standalone-website .container {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    body.dsa-standalone-website .page_content {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    body.dsa-standalone-website #contest-solve-root {
+        width: 100%;
+        max-width: 100%;
+    }
+</style>
+
+
+<div id="contest-solve-root" class="contest-solve-website-root"></div>
+
+{% endblock %}

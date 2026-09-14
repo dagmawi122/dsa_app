@@ -1,7 +1,11 @@
 <template>
-	<div class="dsa-practice-view" :class="{ 'is-standalone': !props.contestMode }">
+	<div
+		class="dsa-practice-view"
+		:class="{ 'is-standalone': props.standalone }"
+	>
 		<header v-if="!props.contestMode" class="dsa-practice-navigation">
-			<a href="/app/list-problems" class="dsa-back-button"
+			
+				<a href="/list-problems" class="dsa-back-button"
 				><svg
 					aria-hidden="true"
 					viewBox="0 0 24 24"
@@ -65,7 +69,7 @@
 											:key="topic"
 											class="dsa-chip dsa-topic-link"
 											:href="
-												'/app/list-problems?topic=' +
+												'/list-problems?topic=' +
 												encodeURIComponent(topic)
 											"
 											:aria-label="__('Find problems about') + ' ' + topic"
@@ -599,10 +603,15 @@ let disposed = false;
 const __ = (text) => text;
 
 const props = defineProps({
-	page: {
-		type: Object,
-		required: true,
-	},
+    page: {
+        type: Object,
+        default: null,
+    },
+
+    standalone: {
+        type: Boolean,
+        default: false,
+    },
 	contestMode: {
 		type: Boolean,
 		default: false,
@@ -919,12 +928,8 @@ async function loadSubmissions() {
 
 	try {
 		if (props.contestMode) {
-			const route = frappe.get_route();
-
-			const contestName = route[1];
-
 			submissions.value = await call("dsa.api.get_contest_submissions", {
-				contest: contestName,
+				contest: props.contestName,
 				problem: problem.value.name,
 			});
 
@@ -1248,12 +1253,12 @@ async function submitCode() {
             : "dsa.api.submit_code";
 
         const args = props.contestMode
-            ? {
-                  contest: frappe.get_route()[1],
-                  problem: problem.value.name,
-                  code: code.value,
-                  language_id: selectedLanguageId.value,
-              }
+			? {
+				contest: props.contestName,
+				problem: problem.value.name,
+				code: code.value,
+				language_id: selectedLanguageId.value,
+			}
             : {
                   problem: problem.value.name,
                   code: code.value,
@@ -1366,19 +1371,18 @@ async function submitCode() {
 }
 
 async function loadContestProgress() {
-	if (!props.contestMode) return;
+    if (!props.contestMode) return;
 
-	const route = frappe.get_route();
-	const contestName = route[1];
+    const contestName = props.contestName;
 
-	if (!contestName) return;
+    if (!contestName) return;
 
-	contestProgressLoading.value = true;
+    contestProgressLoading.value = true;
 
-	try {
-		contestProgress.value = await call("dsa.api.get_contest_progress", {
-			contest: contestName,
-		});
+    try {
+        contestProgress.value = await call("dsa.api.get_contest_progress", {
+            contest: contestName,
+        });
 	} catch (error) {
 		console.error("Failed to load contest progress:", error);
 	} finally {
@@ -1405,9 +1409,15 @@ function refresh() {
 }
 
 function updatePageTitle() {
-	if (!props.contestMode && problem.value && frappe.get_route()[0] === "dsa-practice") {
-		props.page.set_title(`${__("DSA Practice")} / ${problem.value.title}`);
-	}
+    if (!props.contestMode && problem.value) {
+        if (props.page?.set_title) {
+            props.page.set_title(
+                `${__("DSA Practice")} / ${problem.value.title}`
+            );
+        } else {
+            document.title = `DSA Practice / ${problem.value.title}`;
+        }
+    }
 }
 
 async function setContestProblem(contest, newProblemName) {

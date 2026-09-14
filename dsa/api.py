@@ -1579,8 +1579,10 @@ def _estimate_time_complexity(code: str) -> str:
         return "O(n log n)"
 
     function_pattern = re.compile(
-        r"\b(?:int|void|bool|string|long|double|float|char)\s+"
-        r"(\w+)\s*\([^)]*\)\s*\{"
+        r"(?:^|[;\}])\s*"
+        r"(?:[A-Za-z_][\w:<>,\s\*&]*?)\s+"
+        r"(\w+)\s*\([^)]*\)\s*\{",
+        re.MULTILINE,
     )
 
     for match in function_pattern.finditer(code):
@@ -1643,36 +1645,54 @@ def _estimate_time_complexity(code: str) -> str:
     loops = []
 
     for match in loop_pattern.finditer(code):
-        start = match.end()
-        brace_pos = code.find("{", start)
-
-        if brace_pos == -1:
-            continue
-
-        header = code[match.start():brace_pos]
+        # Find the end of the loop's own parenthesized condition, not just
+        # any "(" — this matters for nested parens like for(int i=0;i<f(n);i++).
+        paren_start = code.find("(", match.end() - 1)
+        depth = 1
+        i = paren_start + 1
+        while i < len(code) and depth:
+            if code[i] == "(":
+                depth += 1
+            elif code[i] == ")":
+                depth -= 1
+            i += 1
+        header = code[match.start():i]
 
         constant_loop = bool(
             re.search(
-                r"(?:<|<=)\s*\d+\b",
+                r"(?:<|<=)\s*\d+\s*[;)]",
                 header,
             )
         )
 
-        depth = 1
-        i = brace_pos + 1
+        # Skip whitespace/newlines after the ")" to see what follows.
+        j = i
+        while j < len(code) and code[j] in " \t\r\n":
+            j += 1
 
-        while i < len(code) and depth:
-            if code[i] == "{":
-                depth += 1
-            elif code[i] == "}":
-                depth -= 1
-            i += 1
+        if j < len(code) and code[j] == "{":
+            brace_pos = j
+            depth = 1
+            k = brace_pos + 1
+            while k < len(code) and depth:
+                if code[k] == "{":
+                    depth += 1
+                elif code[k] == "}":
+                    depth -= 1
+                k += 1
+            body_start = brace_pos
+            body_end = k
+        else:
+            # Brace-less loop body: a single statement up to the next ";".
+            stmt_end = code.find(";", j)
+            body_start = j
+            body_end = stmt_end + 1 if stmt_end != -1 else len(code)
 
         loops.append(
             {
                 "start": match.start(),
-                "body_start": brace_pos,
-                "end": i,
+                "body_start": body_start,
+                "end": body_end,
                 "constant": constant_loop,
             }
         )
