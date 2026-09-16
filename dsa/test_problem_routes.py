@@ -34,15 +34,14 @@ class TestProblemRoutes(TestCase):
 
 	@patch("dsa.api._require_login")
 	@patch("dsa.api.frappe.db", new_callable=MagicMock)
+	@patch("dsa.api.frappe.get_all", return_value=[])
 	@patch("dsa.api.frappe.throw", side_effect=frappe.DoesNotExistError)
 	@patch("dsa.api._", side_effect=lambda value: value)
-	def test_unknown_slug_is_not_found(self, translate, throw, db, login):
+	def test_unknown_slug_is_not_found(self, translate, throw, get_all, db, login):
 		db.exists.return_value = False
 		db.get_value.return_value = None
-		db.get_values.return_value = []
 		with self.assertRaises(frappe.DoesNotExistError):
 			get_problem(slug="missing")
-
 
 	@patch("dsa.api._require_login")
 	@patch("dsa.api.frappe.db", new_callable=MagicMock)
@@ -63,5 +62,3 @@ class TestProblemRoutes(TestCase):
 		get_problem(name="title-add-two-numbers")
 		db.get_value.assert_called_once_with("DSAProblem", {"route_slug": "title-add-two-numbers"}, "name")
 		get_doc.assert_called_once_with("DSAProblem", "actual-problem-id")
-
-

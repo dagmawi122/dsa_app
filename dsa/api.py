@@ -206,10 +206,10 @@ def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, A
 			frappe.db.get_value("DSAProblem", {"route_slug": target}, "name")
 			or frappe.db.get_value("DSAProblem", {"title": target}, "name")
 		)
-		if not doc_name and hasattr(frappe.db, "get_values"):
-			for p_name, p_title in frappe.db.get_values("DSAProblem", filters={}, fieldname=["name", "title"]) or []:
-				if make_problem_slug(p_title) == target:
-					doc_name = p_name
+		if not doc_name:
+			for row in frappe.get_all("DSAProblem", fields=["name", "title"]):
+				if make_problem_slug(row.get("title")) == target:
+					doc_name = row.get("name")
 					break
 
 	if not doc_name or not frappe.db.exists("DSAProblem", doc_name):
