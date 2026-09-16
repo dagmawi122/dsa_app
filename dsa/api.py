@@ -12,6 +12,7 @@ from frappe import _
 from frappe.utils import cint, now_datetime
 
 from dsa.dsa.doctype.contest.contest import get_contest_status
+from dsa.problem_routes import make_problem_slug
 
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
@@ -170,9 +171,8 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_problems() -> list[dict[str, Any]]:
-	_require_login()
 	problems = frappe.get_all(
 		"DSAProblem",
 		fields=["name", "title", "difficulty", "route_slug"],
@@ -192,14 +192,30 @@ def get_problems() -> list[dict[str, Any]]:
 	return sorted(problems, key=lambda problem: (difficulty_order.get(problem.difficulty, 3), problem.title))
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, Any]:
-	_require_login()
-	if slug:
-		name = frappe.db.get_value("DSAProblem", {"route_slug": slug}, "name")
-	if not name:
+	target = slug or name
+	if not target:
 		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
-	return _problem_payload(frappe.get_doc("DSAProblem", name))
+
+	doc_name = None
+	if frappe.db.exists("DSAProblem", target):
+		doc_name = target
+	else:
+		doc_name = (
+			frappe.db.get_value("DSAProblem", {"route_slug": target}, "name")
+			or frappe.db.get_value("DSAProblem", {"title": target}, "name")
+		)
+		if not doc_name and hasattr(frappe.db, "get_values"):
+			for p_name, p_title in frappe.db.get_values("DSAProblem", filters={}, fieldname=["name", "title"]) or []:
+				if make_problem_slug(p_title) == target:
+					doc_name = p_name
+					break
+
+	if not doc_name or not frappe.db.exists("DSAProblem", doc_name):
+		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
+
+	return _problem_payload(frappe.get_doc("DSAProblem", doc_name))
 
 
 def _contest_payload(contest, current_time=None, include_problems=False) -> dict[str, Any]:

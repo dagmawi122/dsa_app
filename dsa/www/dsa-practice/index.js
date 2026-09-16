@@ -13,7 +13,11 @@ frappe.require("dsa.bundle.js").then(() => {
 
 	console.log("DSAPractice:", window.dsa?.DSAPractice);
 
-	const problemName = window.location.pathname.split("/").filter(Boolean).pop();
+	const pathSegments = window.location.pathname.split("/").filter(Boolean);
+	const lastSegment = pathSegments.pop();
+	const urlParams = new URLSearchParams(window.location.search);
+	const queryProblem = urlParams.get("problem");
+	const problemName = (lastSegment && lastSegment !== "dsa-practice") ? lastSegment : queryProblem;
 
-	new window.dsa.DSAPractice(root, decodeURIComponent(problemName));
+	new window.dsa.DSAPractice(root, decodeURIComponent(problemName || ""));
 });
