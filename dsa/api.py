@@ -12,6 +12,7 @@ from frappe import _
 from frappe.utils import cint, now_datetime
 
 from dsa.dsa.doctype.contest.contest import get_contest_status
+from dsa.problem_routes import make_problem_slug
 
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
@@ -208,7 +209,6 @@ def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, A
 		if not doc_name and frappe.db:
 			try:
 				for p_name, p_title in frappe.db.get_values("DSAProblem", filters={}, fieldname=["name", "title"]):
-					from dsa.dsa.problem_routes import make_problem_slug
 					if make_problem_slug(p_title) == target:
 						doc_name = p_name
 						break
