@@ -193,13 +193,33 @@ def get_problems() -> list[dict[str, Any]]:
 
 @frappe.whitelist(allow_guest=True)
 def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, Any]:
-	if slug:
-		name = frappe.db.get_value("DSAProblem", {"route_slug": slug}, "name")
-	elif name and not frappe.db.exists("DSAProblem", name):
-		name = frappe.db.get_value("DSAProblem", {"route_slug": name}, "name") or name
-	if not name or not frappe.db.exists("DSAProblem", name):
+	target = slug or name
+	if not target:
 		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
-	return _problem_payload(frappe.get_doc("DSAProblem", name))
+
+	doc_name = None
+	if frappe.db.exists("DSAProblem", target):
+		doc_name = target
+	else:
+		doc_name = (
+			frappe.db.get_value("DSAProblem", {"route_slug": target}, "name")
+			or frappe.db.get_value("DSAProblem", {"title": target}, "name")
+		)
+		if not doc_name and frappe.db:
+			try:
+				for p_name, p_title in frappe.db.get_values("DSAProblem", filters={}, fieldname=["name", "title"]):
+					from dsa.dsa.problem_routes import make_problem_slug
+					if make_problem_slug(p_title) == target:
+						doc_name = p_name
+						break
+			except Exception:
+				pass
+
+	if not doc_name or not frappe.db.exists("DSAProblem", doc_name):
+		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
+
+	return _problem_payload(frappe.get_doc("DSAProblem", doc_name))
+
 
 
 
