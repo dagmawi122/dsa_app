@@ -171,8 +171,9 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 	}
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_problems() -> list[dict[str, Any]]:
+	_require_login()
 	problems = frappe.get_all(
 		"DSAProblem",
 		fields=["name", "title", "difficulty", "route_slug"],
@@ -192,8 +193,9 @@ def get_problems() -> list[dict[str, Any]]:
 	return sorted(problems, key=lambda problem: (difficulty_order.get(problem.difficulty, 3), problem.title))
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, Any]:
+	_require_login()
 	target = slug or name
 	if not target:
 		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
