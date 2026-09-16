@@ -41,8 +41,23 @@ class TestProblemRoutes(TestCase):
 			get_problem(slug="missing")
 
 	@patch("dsa.api._require_login")
+	@patch("dsa.api.frappe.db", new_callable=MagicMock)
 	@patch("dsa.api.frappe.get_doc")
 	@patch("dsa.api._problem_payload")
-	def test_contests_can_still_load_by_id(self, payload, get_doc, login):
+	def test_contests_can_still_load_by_id(self, payload, get_doc, db, login):
+		db.exists.return_value = True
 		get_problem(name="contest-problem-id")
 		get_doc.assert_called_once_with("DSAProblem", "contest-problem-id")
+
+	@patch("dsa.api._require_login")
+	@patch("dsa.api.frappe.db", new_callable=MagicMock)
+	@patch("dsa.api.frappe.get_doc")
+	@patch("dsa.api._problem_payload")
+	def test_name_can_resolve_slug(self, payload, get_doc, db, login):
+		db.exists.side_effect = lambda doctype, name: name == "actual-problem-id"
+		db.get_value.return_value = "actual-problem-id"
+		get_problem(name="title-add-two-numbers")
+		db.get_value.assert_called_once_with("DSAProblem", {"route_slug": "title-add-two-numbers"}, "name")
+		get_doc.assert_called_once_with("DSAProblem", "actual-problem-id")
+
+
