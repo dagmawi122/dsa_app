@@ -206,21 +206,16 @@ def get_problem(name: str | None = None, slug: str | None = None) -> dict[str, A
 			frappe.db.get_value("DSAProblem", {"route_slug": target}, "name")
 			or frappe.db.get_value("DSAProblem", {"title": target}, "name")
 		)
-		if not doc_name and frappe.db:
-			try:
-				for p_name, p_title in frappe.db.get_values("DSAProblem", filters={}, fieldname=["name", "title"]):
-					if make_problem_slug(p_title) == target:
-						doc_name = p_name
-						break
-			except Exception:
-				pass
+		if not doc_name and hasattr(frappe.db, "get_values"):
+			for p_name, p_title in frappe.db.get_values("DSAProblem", filters={}, fieldname=["name", "title"]) or []:
+				if make_problem_slug(p_title) == target:
+					doc_name = p_name
+					break
 
 	if not doc_name or not frappe.db.exists("DSAProblem", doc_name):
 		frappe.throw(_("Problem not found."), frappe.DoesNotExistError)
 
 	return _problem_payload(frappe.get_doc("DSAProblem", doc_name))
-
-
 
 
 def _contest_payload(contest, current_time=None, include_problems=False) -> dict[str, Any]:
