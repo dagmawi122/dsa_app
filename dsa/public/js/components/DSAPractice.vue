@@ -207,6 +207,14 @@
 										}}</span>
 									</span>
 
+									<span v-if="submission.memory" class="stat-chip">
+										<span class="stat-icon" aria-hidden="true">▤</span>
+										<span class="stat-label">{{ __("Memory") }}</span>
+										<span class="stat-value">{{
+											formatMemory(submission.memory)
+										}}</span>
+									</span>
+
 									<span v-if="submission.time_complexity" class="stat-chip">
 										<span class="stat-icon" aria-hidden="true">Σ</span>
 										<span class="stat-label">{{ __("Time") }}</span>
@@ -472,6 +480,9 @@
 											<span v-if="resultRuntime">
 												{{ __("Runtime") }}: {{ resultRuntime }}
 											</span>
+											<span v-if="resultMemory">
+												{{ __("Memory") }}: {{ resultMemory }}
+											</span>
 										</div>
 
 										<div
@@ -669,6 +680,7 @@ const testResults = ref([]);
 const activeResultCaseIndex = ref(0);
 const overallStatus = ref("");
 const resultRuntime = ref("");
+const resultMemory = ref("");
 const resultComplexity = ref("");
 const resultSpaceComplexity = ref("");
 const complexityResult = ref("");
@@ -738,11 +750,12 @@ function formatRuntime(runtime) {
 	return `${seconds.toFixed(2)} s`;
 }
 
-// Whether a submission has any of the 5 result fields worth rendering as a
-// stats row (runtime, time complexity, space complexity).
 function hasStats(submission) {
 	return Boolean(
-		submission?.runtime || submission?.time_complexity || submission?.space_complexity
+		submission?.runtime ||
+		submission?.memory ||
+		submission?.time_complexity ||
+		submission?.space_complexity
 	);
 }
 
@@ -906,6 +919,7 @@ function clearResults() {
     testResults.value = [];
     overallStatus.value = "";
     resultRuntime.value = "";
+	resultMemory.value = "";
     resultComplexity.value = "";
     resultSpaceComplexity.value = "";
     complexityResult.value = "";
@@ -1207,7 +1221,9 @@ async function runCode() {
 				resultRuntime.value = result.time
 					? formatRuntime(result.time)
 					: "";
-
+				resultMemory.value = result.memory
+					? formatMemory(result.memory)
+					: "";
 				testResults.value = [
 					{
 						index: activeTestCaseIndex.value + 1,
@@ -1334,6 +1350,10 @@ async function submitCode() {
                 ? formatRuntime(result.runtime)
                 : resultRuntime.value;
 
+			resultMemory.value = result.memory
+				? formatMemory(result.memory)
+				: resultMemory.value;
+
             testResults.value = (result.results || []).map((testResult) =>
                 complexityRejected
                     ? { ...testResult, status: "Rejected" }
@@ -1449,6 +1469,30 @@ onBeforeUnmount(() => {
 	stopResize();
 	clearInterval(timerInterval);
 });
+function formatMemory(memory) {
+	const kb = Number(memory);
+
+	if (!Number.isFinite(kb) || kb < 0) {
+		return null;
+	}
+
+	if (kb === 0) {
+		return "0 KB";
+	}
+
+	if (kb < 1024) {
+		return `${Math.round(kb)} KB`;
+	}
+
+	const mb = kb / 1024;
+
+	if (mb < 1024) {
+		return `${mb.toFixed(2)} MB`;
+	}
+
+	const gb = mb / 1024;
+	return `${gb.toFixed(2)} GB`;
+}
 </script>
 
 <style scoped>
@@ -2693,5 +2737,52 @@ body.dsa-resizing {
 
 .complexity-result.unknown .complexity-result-icon {
     display: none;
+}
+
+body.dsa-practice-website,
+body.dsa-standalone-website {
+	--bg-color: #ffffff;
+	--card-bg: #ffffff;
+	--control-bg: #f5f5f5;
+	--fg-hover-color: #eeeeee;
+	--border-color: #d9d9d9;
+
+	--text-color: #222222;
+	--text-muted: #777777;
+
+	--text-on-blue: #2563eb;
+	--text-on-green: #16a34a;
+	--text-on-red: #dc2626;
+	--text-on-orange: #d97706;
+	--text-on-purple: #7c3aed;
+
+	background: var(--bg-color);
+	color: var(--text-color);
+}
+
+@media (prefers-color-scheme: dark) {
+	body.dsa-practice-website,
+	body.dsa-standalone-website {
+		--bg-color: #161616;
+		--card-bg: #1e1e1e;
+		--control-bg: #252525;
+		--fg-hover-color: #303030;
+		--border-color: #3a3a3a;
+
+		--text-color: #e6e6e6;
+		--text-muted: #999999;
+
+		--text-on-blue: #6ea8fe;
+		--text-on-green: #5fd68a;
+		--text-on-red: #ff6b6b;
+		--text-on-orange: #f5b84b;
+		--text-on-purple: #b78cff;
+	}
+}
+
+body.dsa-practice-website .dsa-practice-view,
+body.dsa-standalone-website .dsa-practice-view {
+	background: var(--bg-color) !important;
+	color: var(--text-color) !important;
 }
 </style>

@@ -26,13 +26,13 @@ class ContestPage {
 		}
 	}
 
-	/* =========================================================
-       LISTING
-       ========================================================= */
-
 	render_listing() {
 		$(this.wrapper).html(`
             <div class="contest-page">
+                <button class="back-to-home">
+                    ${this.icon("home")}
+                    <span>Back to Home</span>
+                </button>
                 <div class="contest-hero">
                     <div class="hero-content">
                         <div class="hero-badge">
@@ -61,6 +61,9 @@ class ContestPage {
                 </div>
             </div>
         `);
+        $(".back-to-home").on("click", () => {
+            window.location.href = "/";
+        });
 	}
 
 	async load_contests() {
@@ -357,10 +360,6 @@ class ContestPage {
 		window.location.href = `/contest-page/${contest_name}`;
 	}
 
-	/* =========================================================
-       DETAILS
-       ========================================================= */
-
 	render_details() {
 		$(this.wrapper).html(`
             <div class="contest-page">
@@ -491,13 +490,9 @@ class ContestPage {
 		}
 
 		$(".contest-details-page").html(`
-            <!-- BACK -->
-
             <button class="back-to-contests">
                 <span>←</span> Back to Contests
             </button>
-
-            <!-- HERO -->
 
             <div class="details-hero ${type}">
 
@@ -541,8 +536,6 @@ class ContestPage {
                 </div>
 
             </div>
-
-            <!-- INFORMATION -->
 
             <section class="details-section">
 
@@ -613,8 +606,6 @@ class ContestPage {
 
             </section>
 
-            <!-- ABOUT -->
-
             <section class="details-section">
 
                 <div class="details-section-title">
@@ -651,8 +642,6 @@ class ContestPage {
                 </div>
 
             </section>
-
-            <!-- PROBLEMS -->
 
             <section class="details-section">
 
@@ -1111,10 +1100,6 @@ class ContestPage {
 		);
 	}
 
-	/* =========================================================
-       HELPERS
-       ========================================================= */
-
 	get_status_type(status) {
 		const s = (status || "").toLowerCase();
 
@@ -1208,10 +1193,9 @@ class ContestPage {
 		);
 	}
 
-	// Self-contained inline SVG icons so the UI never depends on an
-	// external icon font (FontAwesome) being loaded/available.
 	icon(name) {
 		const icons = {
+            home: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>`,
 			play: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
 			stop: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>`,
 			check: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6"/></svg>`,
@@ -1234,25 +1218,117 @@ class ContestPage {
 		$("head").append(`
 <style id="contest-page-styles">
 
-/* Theme-aware colors: everything below reads Frappe's theme
-   variables so the page follows whatever light/dark mode the
-   user (or the Frappe desk) is currently set to. */
 
-.contest-page {
+
+body.dsa-standalone-website {
+    --bg-color: #ffffff;
+    --card-bg: #ffffff;
+    --control-bg: #f5f5f5;
+    --fg-hover-color: #eeeeee;
+    --border-color: #d9d9d9;
+
+    --text-color: #222222;
+    --heading-color: #181818;
+    --text-muted: #777777;
+
     --accent: #f5a800;
     --accent-2: #ffcd39;
     --accent-ink: #1a1400;
+
     --accent-soft: rgba(245, 168, 0, 0.13);
     --accent-soft-strong: rgba(245, 168, 0, 0.22);
-    --green: var(--text-on-green, #1f9d5c);
-    --green-2: #34d180;
-    --green-soft: rgba(31, 157, 92, 0.13);
-    --red: var(--text-on-red, #e6484a);
-    --red-soft: rgba(230, 72, 74, 0.1);
+
+    --green: #16803c;
+    --green-2: #34b86f;
+    --green-soft: rgba(22, 128, 60, 0.13);
+
+    --red: #dc2626;
+    --red-soft: rgba(220, 38, 38, 0.10);
+
     --silver: #9aa3ad;
     --bronze: #c97b3d;
-    --card-shadow: 0 1px 2px rgba(15, 15, 15, 0.04), 0 8px 24px rgba(15, 15, 15, 0.05);
-    --card-shadow-hover: 0 2px 4px rgba(15, 15, 15, 0.06), 0 16px 36px rgba(15, 15, 15, 0.09);
+
+    --card-shadow:
+        0 1px 2px rgba(15, 15, 15, 0.04),
+        0 8px 24px rgba(15, 15, 15, 0.05);
+
+    --card-shadow-hover:
+        0 2px 4px rgba(15, 15, 15, 0.06),
+        0 16px 36px rgba(15, 15, 15, 0.09);
+
+    color: var(--text-color);
+    background: var(--bg-color);
+}
+
+
+@media (prefers-color-scheme: dark) {
+    body.dsa-standalone-website {
+        --bg-color: #161616;
+        --card-bg: #1e1e1e;
+        --control-bg: #252525;
+        --fg-hover-color: #303030;
+        --border-color: #3a3a3a;
+
+        --text-color: #e6e6e6;
+        --heading-color: #f0f0f0;
+        --text-muted: #999999;
+
+        --accent: #f5b82e;
+        --accent-2: #ffd45c;
+        --accent-ink: #181200;
+
+        --accent-soft: rgba(245, 184, 46, 0.14);
+        --accent-soft-strong: rgba(245, 184, 46, 0.23);
+
+        --green: #5fd68a;
+        --green-2: #7be3a1;
+        --green-soft: rgba(95, 214, 138, 0.13);
+
+        --red: #ff6b6b;
+        --red-soft: rgba(255, 107, 107, 0.12);
+
+        --silver: #aeb5bd;
+        --bronze: #d8955b;
+
+        --card-shadow:
+            0 1px 2px rgba(0, 0, 0, 0.25),
+            0 8px 24px rgba(0, 0, 0, 0.20);
+
+        --card-shadow-hover:
+            0 2px 4px rgba(0, 0, 0, 0.30),
+            0 16px 36px rgba(0, 0, 0, 0.30);
+    }
+}
+
+
+.contest-page {
+    min-height: 100vh;
+    padding: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+
+    color: var(--text-color);
+
+    font-family:
+        var(--font-stack,
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        Roboto,
+        sans-serif);
+
+    background:
+        radial-gradient(
+            720px 320px at 12% -8%,
+            var(--accent-soft),
+            transparent 60%
+        ),
+        radial-gradient(
+            600px 280px at 100% 0%,
+            var(--green-soft),
+            transparent 55%
+        ),
+        var(--bg-color);
 }
 
 .inline-icon {
@@ -1665,11 +1741,33 @@ class ContestPage {
     transition: transform 0.2s ease;
 }
 
-/* DETAILS */
-
 .contest-details-page {
     max-width: 1000px;
     margin: 0 auto;
+}
+
+.back-to-home {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    padding: 6px 2px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.back-to-home:hover {
+    color: var(--accent);
+    transform: translateX(-2px);
+}
+
+.back-to-home .inline-icon {
+    color: currentColor;
 }
 
 .back-to-contests {
@@ -2089,8 +2187,6 @@ class ContestPage {
     color: var(--text-muted);
     font-size: 13px;
 }
-
-/* LEADERBOARD */
 
 .contest-leaderboard {
     width: 100%;

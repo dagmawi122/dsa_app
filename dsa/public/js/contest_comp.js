@@ -1,5 +1,3 @@
-
-
 class ContestComp {
 	constructor(wrapper, contest_name) {
         this.wrapper = wrapper;
@@ -22,7 +20,6 @@ class ContestComp {
 
 	handle_route_change(contest_name) {
 		if (!contest_name || contest_name === this.contest_name) {
-			// Same contest re-shown: do a quiet refresh, no skeleton flash.
 			this.load_contest({ silent: true });
 			return;
 		}
@@ -32,8 +29,6 @@ class ContestComp {
 		this.render_skeleton();
 		this.load_contest();
 	}
-
-	// ---------- DATA LOADING ----------
 
 	async load_contest(opts = {}) {
 		const silent = !!opts.silent;
@@ -71,12 +66,8 @@ class ContestComp {
 					{ type: "error", retry: true }
 				);
 			}
-			// Silent background refreshes fail quietly — the user keeps
-			// looking at the last good state instead of an error screen.
 		}
 	}
-
-	// ---------- SKELETON / LOADING STATE ----------
 
 	render_skeleton() {
 		$(this.wrapper).find(".contest-comp-page").remove();
@@ -98,8 +89,6 @@ class ContestComp {
             </div>
         `);
 	}
-
-	// ---------- MAIN RENDER ----------
 
 	render_contest(contest, progress) {
 		this.clear_timers();
@@ -136,7 +125,6 @@ class ContestComp {
 		const solvedSet = new Set(progress?.solved || []);
 		const attemptedSet = new Set(progress?.attempted || []);
 
-		// Countdown target: "starts in" for upcoming, "ends in" for running.
 		let countdownTarget = null;
 		let countdownLabel = "";
 
@@ -226,7 +214,6 @@ class ContestComp {
 		$(this.wrapper).find(".contest-comp-page").remove();
 		$(this.wrapper).html(`
             <div class="contest-comp-page">
-                <!-- HERO -->
                 <section class="comp-hero ${type}">
                     <div class="comp-hero-content">
                         <div class="comp-top-row">
@@ -270,7 +257,6 @@ class ContestComp {
 
                 ${guestBannerHtml}
 
-                <!-- CONTEST INFO & PROGRESS -->
                 <section class="comp-info-section">
                     <div class="comp-info-grid">
                         <div class="comp-info-card">
@@ -298,7 +284,6 @@ class ContestComp {
                     </div>
                 </section>
 
-                <!-- PROBLEMS -->
                 <section class="comp-problems-section">
                     <div class="comp-section-heading">
                         <div class="comp-section-title-wrapper">
@@ -437,8 +422,6 @@ class ContestComp {
         `;
 	}
 
-	// ---------- EVENTS ----------
-
 	bind_events() {
 		$(this.wrapper)
         .find(".comp-back-btn")
@@ -501,10 +484,7 @@ class ContestComp {
 	        `/contest-solve/${encodeURIComponent(this.contest_name)}/${encodeURIComponent(problem)}`;
 	}
 
-	// ---------- LEADERBOARD MODAL ----------
-
 	open_leaderboard_modal() {
-		// Guard against double-opens (e.g. rapid double click).
 		this.close_leaderboard_modal();
 
 		const isGuest = frappe.session.user === "Guest";
@@ -551,7 +531,6 @@ class ContestComp {
 
 		$modal.find(".comp-modal-close").on("click", () => this.close_leaderboard_modal());
 
-		// Click on the backdrop (not the modal card itself) closes it.
 		$modal.on("click", (event) => {
 			if (event.target === $modal[0]) this.close_leaderboard_modal();
 		});
@@ -588,7 +567,6 @@ class ContestComp {
 				args: { contest: this.contest_name },
 			});
 
-			// The modal may have been closed while the request was in flight.
 			const $modal = $(this.wrapper).find(".comp-modal-overlay");
 			if (!$modal.length) return;
 
@@ -688,8 +666,6 @@ class ContestComp {
 		return parts.join(" ");
 	}
 
-	// ---------- TOAST ----------
-
 	show_status_toast(type, title, message) {
 		$(this.wrapper).find(".comp-status-toast").remove();
 		clearTimeout(this._toast_timer);
@@ -718,8 +694,6 @@ class ContestComp {
 		}, 3200);
 	}
 
-	// ---------- COUNTDOWN ----------
-
 	start_countdown(targetDate) {
 		this.clear_countdown();
 
@@ -734,7 +708,6 @@ class ContestComp {
 
 			if (diff <= 0) {
 				this.clear_countdown();
-				// Contest just transitioned (started or ended) — refresh quietly.
 				this.load_contest({ silent: true });
 				return;
 			}
@@ -773,14 +746,10 @@ class ContestComp {
 
 	parse_datetime(str) {
 		if (!str) return null;
-		// Frappe returns "YYYY-MM-DD HH:mm:ss[.ffffff]" — normalize to
-		// an ISO-ish string JS can parse reliably.
 		const cleaned = str.replace(" ", "T").split(".")[0];
 		const d = new Date(cleaned);
 		return isNaN(d.getTime()) ? null : d;
 	}
-
-	// ---------- BACKGROUND POLLING ----------
 
 	start_background_refresh() {
 		this.clear_background_refresh();
@@ -802,8 +771,6 @@ class ContestComp {
 		clearTimeout(this._toast_timer);
 		this.close_leaderboard_modal();
 	}
-
-	// ---------- ERROR STATE ----------
 
 	render_error(message, opts = {}) {
 		this.clear_timers();
@@ -844,8 +811,6 @@ class ContestComp {
 		}
 	}
 
-	// ---------- HELPERS ----------
-
 	status_class(status) {
 		const s = (status || "").toLowerCase();
 
@@ -866,8 +831,6 @@ class ContestComp {
 		return frappe.utils.escape_html(str || "");
 	}
 
-	// Self-contained inline SVG icons so the UI never depends on an
-	// external icon font (FontAwesome) being loaded/available.
 	icon(name) {
 		const icons = {
 			play: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
@@ -893,25 +856,126 @@ class ContestComp {
 		$("head").append(`
 <style id="contest-comp-styles">
 
-/* Theme-aware colors: reads Frappe's theme variables so the page
-   follows whatever light/dark mode is currently active. */
+body.dsa-standalone-website {
+    --bg-color: #ffffff;
+    --card-bg: #ffffff;
+    --control-bg: #f5f5f5;
+    --fg-hover-color: #eeeeee;
+    --border-color: #d9d9d9;
 
-.contest-comp-page {
+    --text-color: #222222;
+    --heading-color: #181818;
+    --text-muted: #777777;
+
     --accent: #f5a800;
     --accent-2: #ffcd39;
     --accent-ink: #1a1400;
+
     --accent-soft: rgba(245, 168, 0, 0.13);
     --accent-soft-strong: rgba(245, 168, 0, 0.22);
-    --green: var(--text-on-green, #1f9d5c);
-    --green-2: #34d180;
-    --green-soft: rgba(31, 157, 92, 0.13);
-    --red: var(--text-on-red, #e6484a);
-    --red-soft: rgba(230, 72, 74, 0.1);
-    --blue: var(--text-on-blue, #2f6fed);
-    --blue-soft: rgba(47, 111, 237, 0.12);
-    --card-shadow: 0 1px 2px rgba(15, 15, 15, 0.04), 0 8px 24px rgba(15, 15, 15, 0.05);
-    --card-shadow-hover: 0 2px 4px rgba(15, 15, 15, 0.06), 0 16px 36px rgba(15, 15, 15, 0.09);
+
+    --green: #16803c;
+    --green-2: #34b86f;
+    --green-soft: rgba(22, 128, 60, 0.13);
+
+    --red: #dc2626;
+    --red-soft: rgba(220, 38, 38, 0.10);
+
+    --blue: #2563eb;
+    --blue-soft: rgba(37, 99, 235, 0.12);
+
+    --silver: #9aa3ad;
+    --bronze: #c97b3d;
+
+    --card-shadow:
+        0 1px 2px rgba(15, 15, 15, 0.04),
+        0 8px 24px rgba(15, 15, 15, 0.05);
+
+    --card-shadow-hover:
+        0 2px 4px rgba(15, 15, 15, 0.06),
+        0 16px 36px rgba(15, 15, 15, 0.09);
+
+    color: var(--text-color);
+    background: var(--bg-color);
 }
+
+
+@media (prefers-color-scheme: dark) {
+    body.dsa-standalone-website {
+        --bg-color: #161616;
+        --card-bg: #1e1e1e;
+        --control-bg: #252525;
+        --fg-hover-color: #303030;
+        --border-color: #3a3a3a;
+
+        --text-color: #e6e6e6;
+        --heading-color: #f0f0f0;
+        --text-muted: #999999;
+
+        --accent: #f5b82e;
+        --accent-2: #ffd45c;
+        --accent-ink: #181200;
+
+        --accent-soft: rgba(245, 184, 46, 0.14);
+        --accent-soft-strong: rgba(245, 184, 46, 0.23);
+
+        --green: #5fd68a;
+        --green-2: #7be3a1;
+        --green-soft: rgba(95, 214, 138, 0.13);
+
+        --red: #ff6b6b;
+        --red-soft: rgba(255, 107, 107, 0.12);
+
+        --blue: #6ea8fe;
+        --blue-soft: rgba(110, 168, 254, 0.14);
+
+        --silver: #aeb5bd;
+        --bronze: #d8955b;
+
+        --card-shadow:
+            0 1px 2px rgba(0, 0, 0, 0.25),
+            0 8px 24px rgba(0, 0, 0, 0.20);
+
+        --card-shadow-hover:
+            0 2px 4px rgba(0, 0, 0, 0.30),
+            0 16px 36px rgba(0, 0, 0, 0.30);
+    }
+}
+
+
+body.dsa-standalone-website #page-index,
+body.dsa-standalone-website .page-content-wrapper,
+body.dsa-standalone-website main.container,
+body.dsa-standalone-website .layout-main-section,
+body.dsa-standalone-website .layout-main-section-wrapper,
+body.dsa-standalone-website .page-container {
+    background: var(--bg-color) !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+body.dsa-standalone-website > main.container {
+    width: 100% !important;
+    max-width: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+body.dsa-standalone-website #page-index {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+}
+
+body.dsa-standalone-website {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+}
+
+
 
 .comp-icon {
     display: inline-flex;
@@ -950,8 +1014,6 @@ class ContestComp {
         radial-gradient(600px 280px at 100% 0%, var(--green-soft), transparent 55%),
         var(--bg-color);
 }
-
-/* SKELETON LOADING STATE */
 
 .comp-skeleton-hero,
 .comp-skeleton-card,
@@ -994,8 +1056,6 @@ class ContestComp {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
-
-/* HERO */
 
 .comp-hero {
     position: relative;
@@ -1199,8 +1259,6 @@ class ContestComp {
     transform: rotate(-4deg);
 }
 
-/* GUEST BANNER */
-
 .comp-guest-banner {
     display: flex;
     align-items: center;
@@ -1257,8 +1315,6 @@ class ContestComp {
 .comp-guest-login-btn:hover {
     opacity: 0.88;
 }
-
-/* INFO / PROGRESS */
 
 .comp-info-section {
     margin-bottom: 35px;
@@ -1375,8 +1431,6 @@ class ContestComp {
     transition: width 0.3s ease;
 }
 
-/* PROBLEMS */
-
 .comp-problems-section {
     margin-bottom: 40px;
 }
@@ -1477,8 +1531,6 @@ class ContestComp {
     border-color: var(--green);
 }
 
-/* When the contest isn't currently running (ended or upcoming), problems
-   are still clickable (to surface a status toast) but visually locked. */
 .comp-problem-list.is-locked .comp-problem-card {
     cursor: not-allowed;
 }
@@ -1592,8 +1644,6 @@ class ContestComp {
     transform: translateX(3px);
 }
 
-/* EMPTY / ERROR STATES */
-
 .comp-empty-state {
     padding: 60px;
     text-align: center;
@@ -1667,8 +1717,6 @@ class ContestComp {
 .comp-retry-btn:hover {
     opacity: 0.88;
 }
-
-/* STATUS TOAST (ended / upcoming / info) */
 
 .comp-status-toast {
     position: fixed;
@@ -1754,8 +1802,6 @@ class ContestComp {
     line-height: 1.4;
 }
 
-/* LEADERBOARD MODAL */
-
 .comp-modal-overlay {
     position: fixed;
     inset: 0;
@@ -1839,8 +1885,6 @@ class ContestComp {
     padding: 18px 22px 22px;
     overflow-y: auto;
 }
-
-/* Leaderboard table */
 
 .comp-lb-table {
     display: flex;
@@ -1931,8 +1975,6 @@ class ContestComp {
     font-weight: 800;
 }
 
-/* Loading skeleton inside modal */
-
 .comp-leaderboard-loading {
     display: flex;
     flex-direction: column;
@@ -1952,8 +1994,6 @@ class ContestComp {
     animation: comp-shimmer 1.4s ease-in-out infinite;
     border: 1px solid var(--border-color);
 }
-
-/* Modal empty/error/guest state */
 
 .comp-modal-state {
     text-align: center;

@@ -3,15 +3,31 @@ import DSAPractice from "./components/DSAPractice.vue";
 import ProblemList from "./components/ProblemList.vue";
 
 function syncPracticeLayout() {
-	if (!frappe.router) {
-		return;
-	}
+    if (!frappe.router) {
+        return;
+    }
 
-	const route = frappe.get_route();
-	document.body.classList.toggle(
-		"dsa-focus-mode",
-		route[0] === "dsa-practice" && !!route[1]
-	);
+    const route = frappe.get_route();
+    const routeName = route[0];
+
+    const isDSAPage = [
+        "dsa-practice",
+        "contest-solve",
+        "contest-page",
+        "contest-comp",
+        "list-problems",
+        "leaderboard",
+    ].includes(routeName);
+
+    document.body.classList.toggle(
+        "dsa-focus-mode",
+        routeName === "dsa-practice" && !!route[1]
+    );
+
+    document.body.classList.toggle(
+        "dsa-page-mode",
+        isDSAPage
+    );
 }
 
 if (frappe.router) {

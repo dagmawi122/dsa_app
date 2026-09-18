@@ -279,7 +279,7 @@ website_route_rules = [
         "to_route": "list-problems",
     },
     {
-        "from_route": "/dsa-practice/<problem_name>",
+        "from_route": "/list-problems/<problem_name>",
         "to_route": "dsa-practice",
     },
     {

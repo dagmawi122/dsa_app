@@ -1,5 +1,22 @@
 <template>
 	<section class="problem-catalog" aria-labelledby="catalog-title">
+		<a href="/" class="back-to-home" aria-label="Back to Home">
+			<svg
+				aria-hidden="true"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M3 10.5 12 3l9 7.5" />
+				<path d="M5 9.5V21h14V9.5" />
+				<path d="M9 21v-6h6v6" />
+			</svg>
+			<span>{{ __("Back to Home") }}</span>
+		</a>
+
 		<header class="catalog-header">
 			<div>
 				<div class="catalog-eyebrow">
@@ -160,14 +177,28 @@
 						</tr>
 					</thead>
 					<tbody>
-						<tr v-for="(item, index) in filteredProblems" :key="item.name">
+						<tr
+							v-for="(item, index) in filteredProblems"
+							:key="item.name"
+							:class="{ 'is-solved': item.solved }"
+						>
 							<td>
-								<a :href="problemUrl(item)" class="problem-title"
-									><span class="problem-number">{{
-										String(index + 1).padStart(2, "0")
-									}}</span
-									><span>{{ item.title }}</span></a
-								>
+								<a :href="problemUrl(item)" class="problem-title">
+									<span
+										v-if="item.solved"
+										class="problem-solved-icon"
+										aria-label="Solved"
+										:title="__('Solved')"
+									>
+										✓
+									</span>
+
+									<span class="problem-number">
+										{{ String(index + 1).padStart(2, "0") }}
+									</span>
+
+									<span>{{ item.title }}</span>
+								</a>
 							</td>
 							<td>
 								<span :class="['difficulty-badge', item.difficulty]"
@@ -194,10 +225,18 @@
 								<a
 									:href="problemUrl(item)"
 									class="open-problem"
-									:aria-label="__('Solve') + ' ' + item.title"
-									><span>{{ __("Solve") }}</span
-									><span aria-hidden="true">↗</span></a
+									:class="{ 'is-solved': item.solved }"
+									:aria-label="(item.solved ? __('Solved') : __('Solve')) + ' ' + item.title"
 								>
+									<span v-if="item.solved" class="solved-label">
+										{{ __("Solved") }}
+									</span>
+									<span v-else>
+										{{ __("Solve") }}
+									</span>
+
+									<span aria-hidden="true">↗</span>
+								</a>
 							</td>
 						</tr>
 					</tbody>
@@ -240,7 +279,7 @@ const filteredProblems = computed(() =>
 );
 const difficultyCount = (level) =>
 	allProblems.value.filter((item) => item.difficulty === level).length;
-const problemUrl = (item) => "/dsa-practice/" + encodeURIComponent(item.route_slug);
+const problemUrl = (item) => "/list-problems/" + encodeURIComponent(item.route_slug);
 function applyTopicFromRoute() {
 	const params = new URLSearchParams(window.location.search);
 	if (!params.has("topic")) return;
@@ -250,8 +289,6 @@ function applyTopicFromRoute() {
 	if (frappe.route_options) delete frappe.route_options.topic;
 }
 
-// Keep the URL in sync so clearing/changing a linked topic survives returning
-// to this cached Desk page and opening its URL directly.
 watch(
 	selectedTopics,
 	(topics) => {
@@ -297,12 +334,90 @@ defineExpose({ refresh });
 </script>
 
 <style scoped>
+
+:global(body.dsa-practice-website),
+:global(body.dsa-standalone-website) {
+	--bg-color: #ffffff;
+	--card-bg: #ffffff;
+	--control-bg: #f5f5f5;
+	--fg-hover-color: #eeeeee;
+	--border-color: #d9d9d9;
+
+	--text-color: #222222;
+	--heading-color: #181818;
+	--text-muted: #777777;
+
+	--primary: #2563eb;
+
+	--bg-blue: #e8f0ff;
+	--bg-green: #e8f7ed;
+	--bg-orange: #fff4df;
+	--bg-red: #fdeaea;
+
+	--solved-color: #16803c;
+	--solved-bg: #eaf7ee;
+
+	--text-on-blue: #2563eb;
+	--text-on-green: #16803c;
+	--text-on-orange: #b45309;
+	--text-on-red: #dc2626;
+
+	color: var(--text-color);
+	background: var(--bg-color);
+}
+
+@media (prefers-color-scheme: dark) {
+	:global(body.dsa-practice-website),
+	:global(body.dsa-standalone-website) {
+		--bg-color: #161616;
+		--card-bg: #1e1e1e;
+		--control-bg: #252525;
+		--fg-hover-color: #303030;
+		--border-color: #3a3a3a;
+
+		--text-color: #e6e6e6;
+		--heading-color: #f0f0f0;
+		--text-muted: #999999;
+
+		--primary: #6ea8fe;
+
+		--bg-blue: #1d2b44;
+		--bg-green: #173524;
+		--bg-orange: #3b2c13;
+		--bg-red: #3b1d1d;
+
+		--text-on-blue: #6ea8fe;
+		--text-on-green: #5fd68a;
+		--text-on-orange: #f5b84b;
+		--text-on-red: #ff6b6b;
+		--solved-color: #5fdb8a;
+		--solved-bg: #173522;
+	}
+}
+
+
+
+:global(body.dsa-standalone-website #page-index),
+:global(body.dsa-standalone-website .page-content-wrapper),
+:global(body.dsa-standalone-website main.container),
+:global(body.dsa-practice-website #page-index),
+:global(body.dsa-practice-website .page-content-wrapper),
+:global(body.dsa-practice-website main.container) {
+	background: var(--bg-color) !important;
+	border: 0 !important;
+	border-left: 0 !important;
+	border-right: 0 !important;
+	box-shadow: none !important;
+	outline: none !important;
+}
+
 .problem-catalog {
 	max-width: 1240px;
 	margin: 0 auto;
 	padding: 24px 8px 40px;
 	color: var(--text-color);
 }
+
 .catalog-header {
 	display: flex;
 	justify-content: space-between;
@@ -311,6 +426,7 @@ defineExpose({ refresh });
 	gap: 24px;
 	margin-bottom: 30px;
 }
+
 .catalog-eyebrow {
 	display: flex;
 	align-items: center;
@@ -320,6 +436,7 @@ defineExpose({ refresh });
 	font-weight: 650;
 	letter-spacing: 1.5px;
 }
+
 .catalog-mark {
 	display: grid;
 	place-items: center;
@@ -331,6 +448,7 @@ defineExpose({ refresh });
 	font-size: 14px;
 	letter-spacing: -1px;
 }
+
 .catalog-header h1 {
 	margin: 14px 0 10px;
 	font-size: clamp(26px, 3vw, 36px);
@@ -338,11 +456,13 @@ defineExpose({ refresh });
 	letter-spacing: -1.2px;
 	color: var(--heading-color, var(--text-color));
 }
+
 .catalog-header p {
 	margin: 0;
 	color: var(--text-muted);
 	font-size: 14px;
 }
+
 .catalog-button {
 	display: inline-flex;
 	align-items: center;
@@ -358,9 +478,11 @@ defineExpose({ refresh });
 	cursor: pointer;
 	text-decoration: none;
 }
+
 .catalog-button:hover {
 	background: var(--fg-hover-color);
 }
+
 .catalog-stats {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -369,12 +491,15 @@ defineExpose({ refresh });
 	border-radius: 12px;
 	background: var(--card-bg);
 }
+
 .catalog-stat {
 	padding: 20px 24px;
 }
+
 .catalog-stat + .catalog-stat {
 	border-left: 1px solid var(--border-color);
 }
+
 .catalog-stat > span {
 	display: flex;
 	align-items: center;
@@ -382,6 +507,7 @@ defineExpose({ refresh });
 	color: var(--text-muted);
 	font-size: 12px;
 }
+
 .catalog-stat strong {
 	display: block;
 	margin-top: 12px;
@@ -389,7 +515,9 @@ defineExpose({ refresh });
 	line-height: 1.1;
 	font-weight: 600;
 	letter-spacing: -0.8px;
+	color: var(--text-color);
 }
+
 .catalog-stat small {
 	display: block;
 	margin-top: 8px;
@@ -398,6 +526,7 @@ defineExpose({ refresh });
 	font-weight: 400;
 	color: var(--text-muted);
 }
+
 .difficulty-dot {
 	display: inline-block;
 	width: 6px;
@@ -406,20 +535,28 @@ defineExpose({ refresh });
 	background: currentColor;
 	flex-shrink: 0;
 }
+
 .difficulty-dot.easy {
 	color: var(--text-on-green);
 }
+
 .difficulty-dot.medium {
 	color: var(--text-on-orange);
 }
+
 .difficulty-dot.hard {
 	color: var(--text-on-red);
 }
+
 .catalog-surface {
-	border: 1px solid var(--border-color);
-	border-radius: 12px;
+	border-top: 1px solid var(--border-color);
+	border-bottom: 1px solid var(--border-color);
+	border-left: 0;
+	border-right: 0;
+	border-radius: 0;
 	background: var(--card-bg);
 }
+
 .catalog-toolbar {
 	display: flex;
 	align-items: center;
@@ -427,6 +564,7 @@ defineExpose({ refresh });
 	flex-wrap: wrap;
 	padding: 20px 22px 14px;
 }
+
 .catalog-search {
 	display: flex;
 	flex: 1;
@@ -439,12 +577,14 @@ defineExpose({ refresh });
 	border-radius: 8px;
 	background: var(--control-bg);
 }
+
 .catalog-search svg {
 	width: 17px;
 	height: 17px;
 	color: var(--text-muted);
 	flex-shrink: 0;
 }
+
 .catalog-search input {
 	width: 100%;
 	min-width: 0;
@@ -455,13 +595,21 @@ defineExpose({ refresh });
 	color: var(--text-color);
 	font-size: 12px;
 }
+
+.catalog-search input::placeholder {
+	color: var(--text-muted);
+	opacity: 1;
+}
+
 .catalog-search:focus-within {
 	outline: 2px solid var(--primary);
 	outline-offset: 2px;
 }
+
 .topic-picker {
 	position: relative;
 }
+
 .topic-picker summary,
 .difficulty-select {
 	display: flex;
@@ -477,9 +625,11 @@ defineExpose({ refresh });
 	cursor: pointer;
 	list-style: none;
 }
+
 .topic-picker summary::-webkit-details-marker {
 	display: none;
 }
+
 .filter-count {
 	background: var(--bg-blue);
 	color: var(--text-on-blue);
@@ -487,6 +637,7 @@ defineExpose({ refresh });
 	border-radius: 4px;
 	font-size: 10px;
 }
+
 .topic-options {
 	position: absolute;
 	top: calc(100% + 6px);
@@ -502,11 +653,13 @@ defineExpose({ refresh });
 	background: var(--card-bg);
 	box-shadow: var(--shadow-md, 0 8px 24px #0002);
 }
+
 .topic-options p {
 	margin: 4px 6px 10px;
 	font-size: 11px;
 	color: var(--text-muted);
 }
+
 .topic-options label {
 	display: flex;
 	align-items: center;
@@ -516,13 +669,17 @@ defineExpose({ refresh });
 	font-size: 12px;
 	border-radius: 6px;
 	cursor: pointer;
+	color: var(--text-color);
 }
+
 .topic-options label:hover {
 	background: var(--control-bg);
 }
+
 .topic-options input {
 	accent-color: var(--primary);
 }
+
 .catalog-results-heading {
 	display: flex;
 	align-items: center;
@@ -531,6 +688,7 @@ defineExpose({ refresh });
 	font-size: 11px;
 	color: var(--text-muted);
 }
+
 .clear-filters {
 	border: 0;
 	padding: 0;
@@ -539,12 +697,14 @@ defineExpose({ refresh });
 	cursor: pointer;
 	font-size: 11px;
 }
+
 .selected-topics {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
 	padding: 0 22px 16px;
 }
+
 .selected-topics button {
 	display: flex;
 	gap: 10px;
@@ -557,14 +717,17 @@ defineExpose({ refresh });
 	color: var(--text-on-blue);
 	cursor: pointer;
 }
+
 .catalog-table-wrap {
 	overflow-x: auto;
 }
+
 .catalog-table {
 	width: 100%;
 	border-collapse: collapse;
 	text-align: left;
 }
+
 .catalog-table th {
 	padding: 11px 22px;
 	font-size: 10px;
@@ -575,14 +738,18 @@ defineExpose({ refresh });
 	background: var(--control-bg);
 	border-block: 1px solid var(--border-color);
 }
+
 .catalog-table td {
 	padding: 20px 22px;
 	border-bottom: 1px solid var(--border-color);
 	font-size: 12px;
+	color: var(--text-color);
 }
+
 .catalog-table tbody tr:last-child td {
 	border-bottom: 0;
 }
+
 .problem-title {
 	display: flex;
 	align-items: center;
@@ -593,16 +760,19 @@ defineExpose({ refresh });
 	text-decoration: none;
 	min-width: 130px;
 }
+
 .problem-title:hover {
 	color: var(--text-color);
 	text-decoration: none;
 }
+
 .problem-number {
 	color: var(--text-muted);
 	font-size: 11px;
 	font-weight: 400;
 	font-variant-numeric: tabular-nums;
 }
+
 .difficulty-badge {
 	display: inline-flex;
 	align-items: center;
@@ -612,23 +782,28 @@ defineExpose({ refresh });
 	font-size: 10px;
 	font-weight: 550;
 }
+
 .difficulty-badge.easy {
 	background: var(--bg-green);
 	color: var(--text-on-green);
 }
+
 .difficulty-badge.medium {
 	background: var(--bg-orange);
 	color: var(--text-on-orange);
 }
+
 .difficulty-badge.hard {
 	background: var(--bg-red);
 	color: var(--text-on-red);
 }
+
 .row-topics {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 5px;
 }
+
 .row-topics span {
 	padding: 4px 7px;
 	border-radius: 4px;
@@ -637,13 +812,16 @@ defineExpose({ refresh });
 	color: var(--text-muted);
 	white-space: nowrap;
 }
+
 .row-topics .untagged {
 	padding: 0;
 	background: none;
 }
+
 .open-cell {
 	text-align: right;
 }
+
 .open-problem {
 	display: inline-flex;
 	gap: 12px;
@@ -652,13 +830,16 @@ defineExpose({ refresh });
 	text-decoration: none;
 	font-size: 11px;
 }
+
 .open-problem:hover {
-	color: var(--text-muted);
+	color: var(--text-color);
 	text-decoration: none;
 }
+
 .open-problem span:last-child {
 	font-size: 18px;
 }
+
 .catalog-footer {
 	display: flex;
 	justify-content: space-between;
@@ -668,24 +849,30 @@ defineExpose({ refresh });
 	font-size: 10px;
 	color: var(--text-muted);
 }
+
 .catalog-empty {
 	padding: 64px 24px;
 	text-align: center;
 	border-top: 1px solid var(--border-color);
+	color: var(--text-color);
 }
+
 .catalog-empty h2 {
 	margin: 12px 0 8px;
 	font-size: 18px;
 	color: var(--text-color);
 }
+
 .catalog-empty p {
 	font-size: 12px;
 	color: var(--text-muted);
 }
+
 .empty-icon {
 	font-size: 24px;
 	color: var(--text-muted);
 }
+
 .visually-hidden {
 	position: absolute;
 	width: 1px;
@@ -694,63 +881,170 @@ defineExpose({ refresh });
 	clip: rect(0, 0, 0, 0);
 	white-space: nowrap;
 }
-a:focus-visible,
-button:focus-visible,
-summary:focus-visible,
-select:focus-visible {
+
+:global(.problem-catalog) a:focus-visible,
+:global(.problem-catalog) button:focus-visible,
+:global(.problem-catalog) summary:focus-visible,
+:global(.problem-catalog) select:focus-visible {
 	outline: 2px solid var(--primary);
 	outline-offset: 3px;
 }
+
 @media (max-width: 760px) {
 	.problem-catalog {
 		padding: 16px 0 24px;
 	}
+
 	.catalog-header {
 		gap: 18px;
 	}
+
 	.catalog-stats {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
+
 	.catalog-stat {
 		padding: 16px;
 	}
+
 	.catalog-stat:nth-child(3) {
 		border-left: 0;
 	}
+
 	.catalog-stat:nth-child(n + 3) {
 		border-top: 1px solid var(--border-color);
 	}
+
 	.catalog-stat small {
 		font-size: 10px;
 	}
+
 	.catalog-toolbar {
 		padding: 16px;
 		gap: 8px;
 	}
+
 	.catalog-search {
 		flex-basis: 100%;
 	}
+
 	.catalog-results-heading {
 		padding-inline: 16px;
 	}
+
 	.catalog-table th,
 	.catalog-table td {
 		padding: 16px 12px;
 	}
+
 	.topics-column {
 		display: none;
 	}
+
 	.problem-title {
 		gap: 8px;
 	}
+
 	.open-problem > span:first-child {
 		display: none;
 	}
+
 	.catalog-footer {
 		padding: 14px 16px;
 	}
+
 	.catalog-footer > span:last-child {
 		display: none;
 	}
+}
+
+:global(body.dsa-standalone-website) {
+	overflow-x: hidden !important;
+}
+
+:global(body.dsa-standalone-website > main.container) {
+	width: 100% !important;
+	max-width: none !important;
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+:global(body.dsa-standalone-website) {
+	margin: 0 !important;
+	padding: 0 !important;
+	overflow-x: hidden !important;
+}
+:global(body.dsa-standalone-website #page-index) {
+	margin: 0 !important;
+	padding: 0 !important;
+	width: 100% !important;
+	max-width: none !important;
+}
+.problem-catalog {
+	max-width: 1240px;
+	margin: 0 auto;
+	padding: 24px 8px 40px;
+	color: var(--text-color);
+	outline: none !important;
+}
+
+.back-to-home {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 10px;
+	padding: 6px 2px;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 12px;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		color 0.2s ease,
+		transform 0.2s ease;
+}
+
+.back-to-home svg {
+	width: 15px;
+	height: 15px;
+	flex-shrink: 0;
+}
+
+.back-to-home:hover {
+	color: var(--primary);
+	text-decoration: none;
+	transform: translateX(-2px);
+}
+
+.catalog-table tbody tr.is-solved td:first-child {
+	box-shadow: inset 3px 0 0 var(--solved-color);
+}
+
+.problem-solved-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	flex: 0 0 20px;
+	border-radius: 50%;
+	background: var(--solved-bg);
+	color: var(--solved-color);
+	font-size: 13px;
+	font-weight: 800;
+	line-height: 1;
+}
+
+.catalog-table tbody tr.is-solved .problem-number {
+	color: var(--solved-color);
+}
+
+.open-problem.is-solved {
+	color: var(--solved-color);
+}
+
+.solved-label {
+	font-weight: 650;
 }
 </style>

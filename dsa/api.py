@@ -173,24 +173,49 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 
 @frappe.whitelist()
 def get_problems() -> list[dict[str, Any]]:
-	_require_login()
-	problems = frappe.get_all(
-		"DSAProblem",
-		fields=["name", "title", "difficulty", "route_slug"],
-		order_by="title asc",
-	)
-	topics_by_problem = {}
-	for row in frappe.get_all(
-		"DSA Problem Topic",
-		filters={"parenttype": "DSAProblem", "parentfield": "topics"},
-		fields=["parent", "topic"],
-		order_by="idx asc",
-	):
-		topics_by_problem.setdefault(row.parent, []).append(row.topic)
-	for problem in problems:
-		problem["topics"] = topics_by_problem.get(problem.name, [])
-	difficulty_order = {"easy": 0, "medium": 1, "hard": 2}
-	return sorted(problems, key=lambda problem: (difficulty_order.get(problem.difficulty, 3), problem.title))
+    user = _require_login()
+
+    problems = frappe.get_all(
+        "DSAProblem",
+        fields=["name", "title", "difficulty", "route_slug"],
+        order_by="title asc",
+    )
+
+    topics_by_problem = {}
+    for row in frappe.get_all(
+        "DSA Problem Topic",
+        filters={"parenttype": "DSAProblem", "parentfield": "topics"},
+        fields=["parent", "topic"],
+        order_by="idx asc",
+    ):
+        topics_by_problem.setdefault(row.parent, []).append(row.topic)
+
+    # Get every problem this user has successfully solved.
+    # One query instead of one query per problem.
+    solved_problems = set(
+        frappe.get_all(
+            "DSA Submission",
+            filters={
+                "member": user,
+                "status": "Accepted",
+            },
+            pluck="problem",
+        )
+    )
+
+    for problem in problems:
+        problem["topics"] = topics_by_problem.get(problem.name, [])
+        problem["solved"] = problem.name in solved_problems
+
+    difficulty_order = {"easy": 0, "medium": 1, "hard": 2}
+
+    return sorted(
+        problems,
+        key=lambda problem: (
+            difficulty_order.get(problem.difficulty, 3),
+            problem.title,
+        ),
+    )
 
 
 @frappe.whitelist()
@@ -304,8 +329,7 @@ def get_submissions(problem: str) -> list[dict[str, Any]]:
 			"language_id",
 			"creation",
 			"runtime",
-			# NOTE: these were missing before, so the complexity badges never
-			# showed up for previously-saved submissions (only for a live run).
+			"memory",
 			"time_complexity",
 			"space_complexity",
 			"complexity_result",
@@ -1140,6 +1164,7 @@ def get_contest_submissions(
 		submission.complexity_result = None
 		submission.space_complexity_result = None
 		submission.runtime = 0
+		submission.memory = 0
 
 		if submission.dsa_submission:
 			dsa_data = frappe.db.get_value(
@@ -1153,6 +1178,7 @@ def get_contest_submissions(
 					"complexity_result",
 					"space_complexity_result",
 					"runtime",
+					"memory",
 				],
 				as_dict=True,
 			)
@@ -1165,6 +1191,7 @@ def get_contest_submissions(
 				submission.complexity_result = dsa_data.complexity_result
 				submission.space_complexity_result = dsa_data.space_complexity_result
 				submission.runtime = dsa_data.runtime or 0
+				submission.memory = dsa_data.memory or 0
 
 	return submissions
 
@@ -1441,13 +1468,20 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
 	pending = False
 	passed = 0
 	total_runtime = 0.0
+	max_memory = 0.0
 	public_results = []
 
 	for row in doc.results:
 		result = _get_judge0_submission(row.token)
 		judge_status = result.get("status") or {}
-
 		judge_runtime = result.get("time")
+		judge_memory = result.get("memory")
+
+		if judge_memory is not None:
+			try:
+				max_memory = max(max_memory, float(judge_memory))
+			except (TypeError, ValueError):
+				pass
 
 		if judge_runtime is not None:
 			try:
@@ -1517,6 +1551,7 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
 
 	doc.passed_count = passed
 	doc.runtime = total_runtime
+	doc.memory = max_memory
 
 	complexity_rejected = (
 		doc.complexity_result == "Too Complex"
@@ -1543,6 +1578,7 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
 		"passed_count": doc.passed_count,
 		"total_count": doc.total_count,
 		"runtime": doc.runtime,
+		"memory": doc.memory,
 		"results": public_results,
 		"time_complexity": doc.time_complexity,
 		"space_complexity": doc.space_complexity,
