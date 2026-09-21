@@ -35,6 +35,31 @@ class ContestRegistration(Document):
 		if existing:
 			frappe.throw(_("User is already registered for this contest."))
 
+def _send_contest_joined_email(contest_doc):
+	"""Send the Contest Joined email to the current user."""
+	user_email = frappe.db.get_value("User", frappe.session.user, "email")
+
+	if not user_email:
+		frappe.log_error(
+			f"Could not send contest joined email: no email address for {frappe.session.user}",
+			"Contest Joined Email",
+		)
+		return
+
+	template = frappe.get_doc("Email Template", "Contest Joined")
+
+	context = contest_doc.as_dict()
+	context["site_url"] = frappe.utils.get_url()
+
+	subject = frappe.render_template(template.subject, context)
+	message = frappe.render_template(template.response_html, context)
+
+	frappe.sendmail(
+		recipients=[user_email],
+		subject=subject,
+		message=message,
+	)
+
 
 @frappe.whitelist()
 def join_contest(contest: str) -> dict[str, Any]:
@@ -71,6 +96,9 @@ def join_contest(contest: str) -> dict[str, Any]:
 		registration.status = "Joined"
 		registration.joined_at = now
 		registration.save(ignore_permissions=True)
+
+		_send_contest_joined_email(contest_doc)
+
 		return {
 			"success": True,
 			"message": _("Successfully joined the contest."),
@@ -88,6 +116,8 @@ def join_contest(contest: str) -> dict[str, Any]:
 	)
 
 	registration.insert(ignore_permissions=True)
+
+	_send_contest_joined_email(contest_doc)
 
 	return {
 		"success": True,

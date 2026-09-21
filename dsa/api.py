@@ -1872,27 +1872,54 @@ def start_contest_problem(
         as_dict=True,
     )
 
-    if existing:
-        return {
-            "attempt": existing.name,
-            "started_at": existing.started_at,
-        }
+    started_at = existing.started_at if existing else None
+    attempt_name = existing.name if existing else None
 
-    started_at = now_datetime()
+    if not existing:
+        started_at = now_datetime()
 
-    attempt = frappe.get_doc(
+        attempt = frappe.get_doc(
+            {
+                "doctype": "Contest Problem Attempt",
+                "contest": contest_doc.name,
+                "problem": problem,
+                "user": user,
+                "started_at": started_at,
+            }
+        )
+
+        attempt.insert(ignore_permissions=True)
+        attempt_name = attempt.name
+
+
+    accepted_submission_time = frappe.db.get_value(
+        "Contest Submission",
         {
-            "doctype": "Contest Problem Attempt",
             "contest": contest_doc.name,
             "problem": problem,
-            "user": user,
-            "started_at": started_at,
-        }
+            "member": user,
+            "status": "Accepted",
+        },
+        "submission_time",
+        order_by="submission_time asc",
     )
 
-    attempt.insert(ignore_permissions=True)
+    frozen_seconds = None
+
+    if accepted_submission_time:
+        frozen_seconds = max(
+            0,
+            int(
+                frappe.utils.time_diff_in_seconds(
+                    accepted_submission_time,
+                    started_at,
+                )
+            ),
+        )
 
     return {
-        "attempt": attempt.name,
-        "started_at": attempt.started_at,
+        "attempt": attempt_name,
+        "started_at": started_at,
+        "solved": bool(accepted_submission_time),
+        "frozen_seconds": frozen_seconds,
     }

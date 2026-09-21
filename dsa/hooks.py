@@ -145,6 +145,11 @@ add_to_apps_screen = [
 
 # Document Events
 # ---------------
+doc_events = {
+	"Contest": {
+		"after_insert": "dsa.tasks.send_new_contest_notification",
+	}
+}
 # Hook on document methods and events
 
 # doc_events = {
@@ -158,23 +163,11 @@ add_to_apps_screen = [
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"dsa.tasks.all"
-# 	],
-# 	"daily": [
-# 		"dsa.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"dsa.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"dsa.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"dsa.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"dsa.tasks.send_contest_start_notifications"
+	],
+}
 
 # Testing
 # -------
@@ -286,4 +279,17 @@ website_route_rules = [
         "from_route": "/contest-solve/<contest_name>/<problem_name>",
         "to_route": "contest-solve",
     },
+]
+
+fixtures = [
+    {
+        "dt": "Email Template",
+        "filters": [
+            ["name", "in", [
+                "Contest Joined",
+                "New Contest",
+                "Contest Starts Today"
+            ]]
+        ]
+    }
 ]

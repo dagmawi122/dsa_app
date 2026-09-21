@@ -348,7 +348,7 @@
 										{{ __("Submit") }}
 									</button>
 
-									<div v-if="contestMode" class="dsa-timer">
+									<div v-if="contestMode" class="dsa-timer" :class="{ 'is-frozen': submissionMade }">
 										{{ formatTime(elapsedTime) }}
 									</div>
 								</div>
@@ -492,7 +492,10 @@
 											<div class="dsa-complexity-row">
 												<label>{{ __("Time Complexity") }}</label>
 												<span>
-													{{ resultComplexity || __("Unknown") }}
+													<span
+														class="complexity-value"
+														:class="complexityResultClass(complexityResult)"
+													>{{ resultComplexity || __("Unknown") }}</span>
 													<span
 														class="complexity-result"
 														:class="complexityResultClass(complexityResult)"
@@ -508,7 +511,10 @@
 											<div class="dsa-complexity-row">
 												<label>{{ __("Space Complexity") }}</label>
 												<span>
-													{{ resultSpaceComplexity || __("Unknown") }}
+													<span
+														class="complexity-value"
+														:class="complexityResultClass(spaceComplexityResult)"
+													>{{ resultSpaceComplexity || __("Unknown") }}</span>
 													<span
 														class="complexity-result"
 														:class="complexityResultClass(spaceComplexityResult)"
@@ -889,6 +895,14 @@ async function startContestProblem() {
         "POST"
     );
 
+    if (attempt.solved) {
+        clearInterval(timerInterval);
+        submissionMade.value = true;
+        elapsedTime.value = attempt.frozen_seconds ?? 0;
+        return;
+    }
+
+    submissionMade.value = false;
     startTimer(attempt.started_at);
 }
 
@@ -2475,7 +2489,7 @@ function formatMemory(memory) {
 	font-weight: 600;
 }
 
-.dsa-complexity-row span {
+.dsa-complexity-row > span {
 	color: var(--text-color);
 }
 
@@ -2784,5 +2798,31 @@ body.dsa-practice-website .dsa-practice-view,
 body.dsa-standalone-website .dsa-practice-view {
 	background: var(--bg-color) !important;
 	color: var(--text-color) !important;
+}
+
+.dsa-timer.is-frozen {
+	border-color: #1c7a43;
+	color: var(--text-on-green);
+}
+
+.dsa-complexity-row span {
+	color: var(--text-color);
+}
+
+.complexity-value {
+	font-weight: 600;
+	font-family: var(--font-stack-monospace);
+}
+
+.complexity-value.optimal {
+	color: #28c76f;
+}
+
+.complexity-value.too-complex {
+	color: #e05757;
+}
+
+.complexity-value.unknown {
+	color: var(--text-color);
 }
 </style>
