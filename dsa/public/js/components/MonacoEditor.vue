@@ -8,12 +8,20 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const __ = window.__;
-const MONACO_BASE_URL = "/assets/dsa/node_modules/monaco-editor/min/vs";
+const MONACO_BASE_URL =
+	"/assets/dsa/node_modules/monaco-editor/min/vs";
+
 let monacoPromise;
 
 const props = defineProps({
-	modelValue: { type: String, default: "" },
-	language: { type: String, default: "cpp" },
+	modelValue: {
+		type: String,
+		default: "",
+	},
+	language: {
+		type: String,
+		default: "cpp",
+	},
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -22,14 +30,9 @@ const editorContainer = ref(null);
 
 let editor = null;
 let disposed = false;
-let themeMediaQuery = null;
 let themeChangeHandler = null;
 
-function editorTheme() {
-	return window.matchMedia("(prefers-color-scheme: dark)").matches
-		? "vs-dark"
-		: "vs";
-}
+
 
 function loadMonaco() {
 	if (window.monaco) {
@@ -51,15 +54,18 @@ function loadMonaco() {
 			window.MonacoEnvironment = {
 				getWorkerUrl() {
 					const worker = `
-						self.MonacoEnvironment={
-							baseUrl:'${MONACO_BASE_URL}/'
+						self.MonacoEnvironment = {
+							baseUrl: '${MONACO_BASE_URL}/'
 						};
+
 						importScripts(
 							'${MONACO_BASE_URL}/base/worker/workerMain.js'
 						);
 					`;
 
-					return `data:text/javascript;charset=utf-8,${encodeURIComponent(worker)}`;
+					return `data:text/javascript;charset=utf-8,${encodeURIComponent(
+						worker
+					)}`;
 				},
 			};
 
@@ -95,6 +101,33 @@ function loadMonaco() {
 	return monacoPromise;
 }
 
+
+
+function getDsaTheme() {
+	return (
+		document.body.getAttribute("data-theme") ||
+		window.dsaTheme?.get?.() ||
+		"light"
+	);
+}
+
+function getMonacoTheme() {
+	return getDsaTheme() === "dark"
+		? "vs-dark"
+		: "vs";
+}
+
+function applyMonacoTheme(monaco) {
+	if (!monaco?.editor || !editor || disposed) {
+		return;
+	}
+
+	monaco.editor.setTheme(getMonacoTheme());
+}
+
+
+
+
 onMounted(async () => {
 	try {
 		const monaco = await loadMonaco();
@@ -103,60 +136,72 @@ onMounted(async () => {
 			return;
 		}
 
-		editor = monaco.editor.create(editorContainer.value, {
-			value: props.modelValue,
-			language: props.language,
+		editor = monaco.editor.create(
+			editorContainer.value,
+			{
+				value: props.modelValue,
+				language: props.language,
 
-			// Follow the browser/OS color scheme.
-			theme: editorTheme(),
+				/*
+				 * Monaco follows the DSA theme,
+				 * NOT the browser/OS theme.
+				 */
+				theme: getMonacoTheme(),
 
-			automaticLayout: true,
+				automaticLayout: true,
 
-			minimap: {
-				enabled: false,
-			},
+				minimap: {
+					enabled: false,
+				},
 
-			fontSize: 14,
-			lineNumbers: "on",
-			scrollBeyondLastLine: false,
+				fontSize: 14,
+				lineNumbers: "on",
+				scrollBeyondLastLine: false,
 
-			padding: {
-				top: 12,
-				bottom: 12,
-			},
-		});
+				padding: {
+					top: 12,
+					bottom: 12,
+				},
+			}
+		);
 
 		editor.onDidChangeModelContent(() => {
 			if (!editor || disposed) {
 				return;
 			}
 
-			emit("update:modelValue", editor.getValue());
+			emit(
+				"update:modelValue",
+				editor.getValue()
+			);
 		});
 
-		/*
-		 * Keep Monaco synchronized with the browser/OS theme.
-		 *
-		 * Example:
-		 * Light → vs
-		 * Dark  → vs-dark
-		 */
-		themeMediaQuery = window.matchMedia(
-			"(prefers-color-scheme: dark)"
-		);
-
-		themeChangeHandler = () => {
+		themeChangeHandler = (event) => {
 			if (!editor || disposed) {
 				return;
 			}
 
-			monaco.editor.setTheme(editorTheme());
+			const theme =
+				event.detail?.theme ||
+				getDsaTheme();
+
+			monaco.editor.setTheme(
+				theme === "dark"
+					? "vs-dark"
+					: "vs"
+			);
 		};
 
-		themeMediaQuery.addEventListener(
-			"change",
+		window.addEventListener(
+			"dsa-theme-change",
 			themeChangeHandler
 		);
+
+		/*
+		 * Apply the current theme once more after the
+		 * editor has finished initializing.
+		 */
+		applyMonacoTheme(monaco);
 	} catch (error) {
 		console.error(
 			"Failed to initialize Monaco Editor:",
@@ -164,6 +209,9 @@ onMounted(async () => {
 		);
 	}
 });
+
+
+
 
 watch(
 	() => props.modelValue,
@@ -177,6 +225,9 @@ watch(
 		}
 	}
 );
+
+
+
 
 watch(
 	() => props.language,
@@ -192,25 +243,41 @@ watch(
 	}
 );
 
+
+
 function layout() {
 	editor?.layout();
 }
 
+function setTheme(theme) {
+	if (!window.monaco?.editor || !editor || disposed) {
+		return;
+	}
+
+	window.monaco.editor.setTheme(
+		theme === "dark"
+			? "vs-dark"
+			: "vs"
+	);
+}
+
 defineExpose({
 	layout,
+	setTheme,
 });
+
+
 
 onBeforeUnmount(() => {
 	disposed = true;
 
-	if (themeMediaQuery && themeChangeHandler) {
-		themeMediaQuery.removeEventListener(
-			"change",
+	if (themeChangeHandler) {
+		window.removeEventListener(
+			"dsa-theme-change",
 			themeChangeHandler
 		);
 	}
 
-	themeMediaQuery = null;
 	themeChangeHandler = null;
 
 	editor?.dispose();

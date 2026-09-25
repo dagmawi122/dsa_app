@@ -1,22 +1,6 @@
 {% extends "templates/web.html" %}
 
 {% block page_content %}
-<style>
-    body.dsa-practice-website .container {
-        max-width: 100% !important;
-        width: 100% !important;
-    }
-
-    body.dsa-practice-website .page_content {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
-
-    body.dsa-practice-website #dsa-practice-root {
-        width: 100%;
-        max-width: 100%;
-    }
-</style>
 
 <style>
     body.dsa-standalone-website .navbar,
@@ -34,11 +18,12 @@
         max-width: 100% !important;
     }
 
-    body.dsa-standalone-website #contest-solve-root {
+    body.dsa-standalone-website #dsa-practice-root {
         width: 100%;
         max-width: 100%;
     }
 </style>
 
 <div id="dsa-practice-root" class="dsa-practice-website-root"></div>
+
 {% endblock %}

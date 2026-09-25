@@ -24,32 +24,43 @@
 					{{ __("DATA STRUCTURES & ALGORITHMS") }}
 				</div>
 				<h1 id="catalog-title">{{ __("Practice problems") }}</h1>
-				<p>{{ __("Choose a topic. Find your challenge. Build a better solution.") }}</p>
+				<p>
+					{{
+						__(
+							"Choose a topic. Find your challenge. Build a better solution."
+						)
+					}}
+				</p>
 			</div>
 		</header>
 
 		<div class="catalog-stats" aria-label="Problem counts">
 			<div class="catalog-stat">
-				<span>{{ __("Problem library") }}</span
-				><strong
-					>{{ allProblems.length }}<small>{{ __("problems to explore") }}</small></strong
-				>
+				<span>{{ __("Problem library") }}</span>
+				<strong>
+					{{ allProblems.length }}
+					<small>{{ __("problems to explore") }}</small>
+				</strong>
 			</div>
+
 			<div v-for="level in levels" :key="level" class="catalog-stat">
-				<span
-					><i :class="['difficulty-dot', level]"></i
-					>{{ __(level[0].toUpperCase() + level.slice(1)) }}</span
-				>
-				<strong
-					>{{ difficultyCount(level)
-					}}<small>{{
-						level === "easy"
-							? __("Build your foundations")
-							: level === "medium"
-							? __("Put your skills to work")
-							: __("Take on a challenge")
-					}}</small></strong
-				>
+				<span>
+					<i :class="['difficulty-dot', level]"></i>
+					{{ __(level[0].toUpperCase() + level.slice(1)) }}
+				</span>
+
+				<strong>
+					{{ difficultyCount(level) }}
+					<small>
+						{{
+							level === "easy"
+								? __("Build your foundations")
+								: level === "medium"
+								? __("Put your skills to work")
+								: __("Take on a challenge")
+						}}
+					</small>
+				</strong>
 			</div>
 		</div>
 
@@ -66,6 +77,7 @@
 						<circle cx="10.5" cy="10.5" r="6.5" />
 						<path d="m16 16 4 4" />
 					</svg>
+
 					<input
 						v-model="search"
 						type="search"
@@ -73,40 +85,66 @@
 						:aria-label="__('Search problems')"
 					/>
 				</label>
+
 				<details class="topic-picker" @keydown.esc="closeTopicPicker">
 					<summary>
 						{{ __("Topics") }}
-						<span v-if="selectedTopics.length" class="filter-count">{{
-							selectedTopics.length
-						}}</span
-						><span aria-hidden="true">⌄</span>
+
+						<span v-if="selectedTopics.length" class="filter-count">
+							{{ selectedTopics.length }}
+						</span>
+
+						<span aria-hidden="true">⌄</span>
 					</summary>
+
 					<div class="topic-options">
 						<p>{{ __("Match any selected topic") }}</p>
-						<label v-for="topic in availableTopics" :key="topic"
-							><input v-model="selectedTopics" type="checkbox" :value="topic" />{{
-								topic
-							}}</label
+
+						<label
+							v-for="topic in availableTopics"
+							:key="topic"
 						>
-						<p v-if="!availableTopics.length">{{ __("No topics assigned yet.") }}</p>
+							<input
+								v-model="selectedTopics"
+								type="checkbox"
+								:value="topic"
+							/>
+							{{ topic }}
+						</label>
+
+						<p v-if="!availableTopics.length">
+							{{ __("No topics assigned yet.") }}
+						</p>
 					</div>
 				</details>
+
 				<select
 					v-model="difficulty"
 					class="difficulty-select"
 					:aria-label="__('Filter by difficulty')"
 				>
 					<option value="">{{ __("All difficulties") }}</option>
-					<option v-for="level in levels" :key="level" :value="level">
+
+					<option
+						v-for="level in levels"
+						:key="level"
+						:value="level"
+					>
 						{{ __(level[0].toUpperCase() + level.slice(1)) }}
 					</option>
 				</select>
 			</div>
+
 			<div class="catalog-results-heading">
-				<span role="status"
-					>{{ filteredProblems.length }}
-					{{ hasFilters ? __("problems matching your filters") : __("problems") }}</span
-				>
+				<span role="status">
+					{{ filteredProblems.length }}
+					{{
+						hasFilters
+							? __("problems matching your filters")
+							: __("problems")
+					}}
+				</span>
+
 				<button
 					v-if="hasFilters"
 					type="button"
@@ -116,29 +154,59 @@
 					{{ __("Clear filters") }}
 				</button>
 			</div>
-			<div v-if="selectedTopics.length" class="selected-topics">
+
+			<div
+				v-if="selectedTopics.length"
+				class="selected-topics"
+			>
 				<button
 					v-for="topic in selectedTopics"
 					:key="topic"
 					type="button"
 					:aria-label="__('Remove topic') + ': ' + topic"
-					@click="selectedTopics = selectedTopics.filter((item) => item !== topic)"
+					@click="
+						selectedTopics = selectedTopics.filter(
+							(item) => item !== topic
+						)
+					"
 				>
-					{{ topic }} <span aria-hidden="true">×</span>
+					{{ topic }}
+					<span aria-hidden="true">×</span>
 				</button>
 			</div>
 
-			<div v-if="loading" class="catalog-empty" role="status">
+			<div
+				v-if="loading"
+				class="catalog-empty"
+				role="status"
+			>
 				{{ __("Loading your problem library…") }}
 			</div>
-			<div v-else-if="error" class="catalog-empty" role="alert">
+
+			<div
+				v-else-if="error"
+				class="catalog-empty"
+				role="alert"
+			>
 				<h2>{{ error }}</h2>
-				<button type="button" class="catalog-button" @click="refresh">
+
+				<button
+					type="button"
+					class="catalog-button"
+					@click="refresh"
+				>
 					{{ __("Try again") }}
 				</button>
 			</div>
-			<div v-else-if="!filteredProblems.length" class="catalog-empty">
-				<div class="empty-icon" aria-hidden="true">&lt;/&gt;</div>
+
+			<div
+				v-else-if="!filteredProblems.length"
+				class="catalog-empty"
+			>
+				<div class="empty-icon" aria-hidden="true">
+					&lt;/&gt;
+				</div>
+
 				<h2>
 					{{
 						allProblems.length
@@ -146,15 +214,19 @@
 							: __("Your problem library starts here")
 					}}
 				</h2>
+
 				<p>
 					{{
 						allProblems.length
 							? __(
 									"Try another search or clear your filters to explore more problems."
 							  )
-							: __("Problems will appear here once they have been created.")
+							: __(
+									"Problems will appear here once they have been created."
+							  )
 					}}
 				</p>
+
 				<button
 					v-if="hasFilters"
 					type="button"
@@ -164,26 +236,62 @@
 					{{ __("Clear filters") }}
 				</button>
 			</div>
-			<div v-else class="catalog-table-wrap">
+
+			<div
+				v-else
+				class="catalog-table-wrap"
+			>
 				<table class="catalog-table">
 					<thead>
 						<tr>
-							<th scope="col">{{ __("Problem") }}</th>
-							<th scope="col">{{ __("Difficulty") }}</th>
-							<th scope="col" class="topics-column">{{ __("Topics") }}</th>
 							<th scope="col">
-								<span class="visually-hidden">{{ __("Open problem") }}</span>
+								{{ __("Problem") }}
+							</th>
+
+							<th scope="col">
+								{{ __("Difficulty") }}
+							</th>
+
+							<th
+								scope="col"
+								class="topics-column"
+							>
+								{{ __("Topics") }}
+							</th>
+
+							<th scope="col">
+								<span class="visually-hidden">
+									{{ __("Open problem") }}
+								</span>
 							</th>
 						</tr>
 					</thead>
+
 					<tbody>
 						<tr
 							v-for="(item, index) in filteredProblems"
 							:key="item.name"
+							class="problem-row"
 							:class="{ 'is-solved': item.solved }"
+							@click="openProblem(item)"
+							@keydown.enter="openProblem(item)"
+							@keydown.space.prevent="openProblem(item)"
+							tabindex="0"
+							role="link"
+							:aria-label="
+								(item.solved
+									? __('Solved')
+									: __('Solve')) +
+								' ' +
+								item.title
+							"
 						>
 							<td>
-								<a :href="problemUrl(item)" class="problem-title">
+								<a
+									:href="problemUrl(item)"
+									class="problem-title"
+									@click.stop
+								>
 									<span
 										v-if="item.solved"
 										class="problem-solved-icon"
@@ -200,37 +308,71 @@
 									<span>{{ item.title }}</span>
 								</a>
 							</td>
+
 							<td>
-								<span :class="['difficulty-badge', item.difficulty]"
-									><i :class="['difficulty-dot', item.difficulty]"></i
-									>{{
+								<span
+									:class="[
+										'difficulty-badge',
+										item.difficulty
+									]"
+								>
+									<i
+										:class="[
+											'difficulty-dot',
+											item.difficulty
+										]"
+									></i>
+
+									{{
 										__(
 											item.difficulty[0].toUpperCase() +
 												item.difficulty.slice(1)
 										)
-									}}</span
-								>
+									}}
+								</span>
 							</td>
+
 							<td class="topics-column">
 								<div class="row-topics">
-									<span v-for="topic in item.topics" :key="topic">{{
-										topic
-									}}</span
-									><span v-if="!item.topics.length" class="untagged">{{
-										__("Not tagged yet")
-									}}</span>
+									<span
+										v-for="topic in item.topics"
+										:key="topic"
+									>
+										{{ topic }}
+									</span>
+
+									<span
+										v-if="!item.topics.length"
+										class="untagged"
+									>
+										{{ __("Not tagged yet") }}
+									</span>
 								</div>
 							</td>
+
 							<td class="open-cell">
 								<a
 									:href="problemUrl(item)"
 									class="open-problem"
-									:class="{ 'is-solved': item.solved }"
-									:aria-label="(item.solved ? __('Solved') : __('Solve')) + ' ' + item.title"
+									:class="{
+										'is-solved': item.solved
+									}"
+									:aria-label="
+										(item.solved
+											? __('Solved')
+											: __('Solve')) +
+										' ' +
+										item.title
+									"
+									@click.stop
 								>
-									<span v-if="item.solved" class="solved-label">
+									<span
+										v-if="item.solved"
+										class="solved-label"
+									>
 										{{ __("Solved") }}
 									</span>
+
 									<span v-else>
 										{{ __("Solve") }}
 									</span>
@@ -242,9 +384,16 @@
 					</tbody>
 				</table>
 			</div>
+
 			<footer class="catalog-footer">
-				<span>{{ __("One problem. Multiple approaches. Keep improving.") }}</span
-				><span>{{ __("DSA Practice") }} <span aria-hidden="true">↗</span></span>
+				<span>
+					{{ __("One problem. Multiple approaches. Keep improving.") }}
+				</span>
+
+				<span>
+					{{ __("DSA Practice") }}
+					<span aria-hidden="true">↗</span>
+				</span>
 			</footer>
 		</div>
 	</section>
@@ -254,48 +403,93 @@
 import { computed, onMounted, ref, watch } from "vue";
 
 const __ = window.__;
+
 const loading = ref(true);
 const error = ref("");
+
 let fetching = false;
+
 const allProblems = ref([]);
 const selectedTopics = ref([]);
 const search = ref("");
 const difficulty = ref("");
+
 const levels = ["easy", "medium", "hard"];
+
 const availableTopics = computed(() =>
 	[...new Set(allProblems.value.flatMap((item) => item.topics))].sort()
 );
+
 const hasFilters = computed(
-	() => !!(selectedTopics.value.length || search.value || difficulty.value)
+	() =>
+		!!(
+			selectedTopics.value.length ||
+			search.value ||
+			difficulty.value
+		)
 );
+
 const filteredProblems = computed(() =>
 	allProblems.value.filter(
 		(item) =>
 			(!selectedTopics.value.length ||
-				item.topics.some((topic) => selectedTopics.value.includes(topic))) &&
-			(!difficulty.value || item.difficulty === difficulty.value) &&
-			item.title.toLowerCase().includes(search.value.trim().toLowerCase())
+				item.topics.some((topic) =>
+					selectedTopics.value.includes(topic)
+				)) &&
+			(!difficulty.value ||
+				item.difficulty === difficulty.value) &&
+			item.title
+				.toLowerCase()
+				.includes(search.value.trim().toLowerCase())
 	)
 );
+
 const difficultyCount = (level) =>
-	allProblems.value.filter((item) => item.difficulty === level).length;
-const problemUrl = (item) => "/list-problems/" + encodeURIComponent(item.route_slug);
+	allProblems.value.filter(
+		(item) => item.difficulty === level
+	).length;
+
+const problemUrl = (item) =>
+	"/list-problems/" + encodeURIComponent(item.route_slug);
+
+function openProblem(item) {
+	window.location.href = problemUrl(item);
+}
+
 function applyTopicFromRoute() {
 	const params = new URLSearchParams(window.location.search);
+
 	if (!params.has("topic")) return;
-	selectedTopics.value = [...new Set(params.getAll("topic").filter((topic) => topic.trim()))];
+
+	selectedTopics.value = [
+		...new Set(
+			params
+				.getAll("topic")
+				.filter((topic) => topic.trim())
+		),
+	];
+
 	search.value = "";
 	difficulty.value = "";
-	if (frappe.route_options) delete frappe.route_options.topic;
+
+	if (frappe.route_options) {
+		delete frappe.route_options.topic;
+	}
 }
 
 watch(
 	selectedTopics,
 	(topics) => {
 		if (frappe.get_route()[0] !== "list-problems") return;
+
 		const url = new URL(window.location.href);
+
 		url.searchParams.delete("topic");
-		topics.forEach((topic) => url.searchParams.append("topic", topic));
+
+		topics.forEach((topic) => {
+			url.searchParams.append("topic", topic);
+		});
+
 		window.history.replaceState(
 			window.history.state,
 			"",
@@ -310,17 +504,27 @@ function clearFilters() {
 	search.value = "";
 	difficulty.value = "";
 }
+
 function closeTopicPicker(event) {
 	event.currentTarget.open = false;
-	event.currentTarget.querySelector("summary").focus();
+	event.currentTarget
+		.querySelector("summary")
+		.focus();
 }
+
 async function refresh() {
 	applyTopicFromRoute();
+
 	if (fetching) return;
+
 	fetching = true;
 	error.value = "";
+
 	try {
-		const response = await frappe.call({ method: "dsa.api.get_problems" });
+		const response = await frappe.call({
+			method: "dsa.api.get_problems",
+		});
+
 		allProblems.value = response.message || [];
 	} catch (err) {
 		error.value = __("Could not load problems.");
@@ -329,73 +533,75 @@ async function refresh() {
 		fetching = false;
 	}
 }
+
 onMounted(refresh);
+
 defineExpose({ refresh });
 </script>
 
 <style scoped>
 
-:global(body.dsa-practice-website),
-:global(body.dsa-standalone-website) {
-	--bg-color: #ffffff;
-	--card-bg: #ffffff;
-	--control-bg: #f5f5f5;
-	--fg-hover-color: #eeeeee;
-	--border-color: #d9d9d9;
+:global(body.dsa-practice-website[data-theme="light"]),
+:global(body.dsa-standalone-website[data-theme="light"]) {
+	--bg-color: #ffffff !important;
+	--card-bg: #ffffff !important;
+	--control-bg: #f5f5f5 !important;
+	--fg-hover-color: #eeeeee !important;
+	--border-color: #d9d9d9 !important;
 
-	--text-color: #222222;
-	--heading-color: #181818;
-	--text-muted: #777777;
+	--text-color: #222222 !important;
+	--heading-color: #181818 !important;
+	--text-muted: #777777 !important;
 
-	--primary: #2563eb;
+	--primary: #2563eb !important;
 
-	--bg-blue: #e8f0ff;
-	--bg-green: #e8f7ed;
-	--bg-orange: #fff4df;
-	--bg-red: #fdeaea;
+	--bg-blue: #e8f0ff !important;
+	--bg-green: #e8f7ed !important;
+	--bg-orange: #fff4df !important;
+	--bg-red: #fdeaea !important;
 
-	--solved-color: #16803c;
-	--solved-bg: #eaf7ee;
+	--solved-color: #16803c !important;
+	--solved-bg: #eaf7ee !important;
 
-	--text-on-blue: #2563eb;
-	--text-on-green: #16803c;
-	--text-on-orange: #b45309;
-	--text-on-red: #dc2626;
+	--text-on-blue: #2563eb !important;
+	--text-on-green: #16803c !important;
+	--text-on-orange: #b45309 !important;
+	--text-on-red: #dc2626 !important;
 
 	color: var(--text-color);
 	background: var(--bg-color);
 }
 
-@media (prefers-color-scheme: dark) {
-	:global(body.dsa-practice-website),
-	:global(body.dsa-standalone-website) {
-		--bg-color: #161616;
-		--card-bg: #1e1e1e;
-		--control-bg: #252525;
-		--fg-hover-color: #303030;
-		--border-color: #3a3a3a;
+:global(body.dsa-practice-website[data-theme="dark"]),
+:global(body.dsa-standalone-website[data-theme="dark"]) {
+	--bg-color: #161616 !important;
+	--card-bg: #1e1e1e !important;
+	--control-bg: #252525 !important;
+	--fg-hover-color: #303030 !important;
+	--border-color: #3a3a3a !important;
 
-		--text-color: #e6e6e6;
-		--heading-color: #f0f0f0;
-		--text-muted: #999999;
+	--text-color: #e6e6e6 !important;
+	--heading-color: #f0f0f0 !important;
+	--text-muted: #999999 !important;
 
-		--primary: #6ea8fe;
+	--primary: #6ea8fe !important;
 
-		--bg-blue: #1d2b44;
-		--bg-green: #173524;
-		--bg-orange: #3b2c13;
-		--bg-red: #3b1d1d;
+	--bg-blue: #1d2b44 !important;
+	--bg-green: #173524 !important;
+	--bg-orange: #3b2c13 !important;
+	--bg-red: #3b1d1d !important;
 
-		--text-on-blue: #6ea8fe;
-		--text-on-green: #5fd68a;
-		--text-on-orange: #f5b84b;
-		--text-on-red: #ff6b6b;
-		--solved-color: #5fdb8a;
-		--solved-bg: #173522;
-	}
+	--solved-color: #5fdb8a !important;
+	--solved-bg: #173522 !important;
+
+	--text-on-blue: #6ea8fe !important;
+	--text-on-green: #5fd68a !important;
+	--text-on-orange: #f5b84b !important;
+	--text-on-red: #ff6b6b !important;
+
+	color: var(--text-color);
+	background: var(--bg-color);
 }
-
-
 
 :global(body.dsa-standalone-website #page-index),
 :global(body.dsa-standalone-website .page-content-wrapper),
@@ -416,6 +622,7 @@ defineExpose({ refresh });
 	margin: 0 auto;
 	padding: 24px 8px 40px;
 	color: var(--text-color);
+	outline: none !important;
 }
 
 .catalog-header {
@@ -454,7 +661,7 @@ defineExpose({ refresh });
 	font-size: clamp(26px, 3vw, 36px);
 	font-weight: 650;
 	letter-spacing: -1.2px;
-	color: var(--heading-color, var(--text-color));
+	color: var(--heading-color);
 }
 
 .catalog-header p {
@@ -890,6 +1097,87 @@ defineExpose({ refresh });
 	outline-offset: 3px;
 }
 
+:global(body.dsa-standalone-website) {
+	margin: 0 !important;
+	padding: 0 !important;
+	overflow-x: hidden !important;
+}
+
+:global(body.dsa-standalone-website > main.container) {
+	width: 100% !important;
+	max-width: none !important;
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+
+:global(body.dsa-standalone-website #page-index) {
+	margin: 0 !important;
+	padding: 0 !important;
+	width: 100% !important;
+	max-width: none !important;
+}
+
+.back-to-home {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 10px;
+	padding: 6px 2px;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 12px;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		color 0.2s ease,
+		transform 0.2s ease;
+}
+
+.back-to-home svg {
+	width: 15px;
+	height: 15px;
+	flex-shrink: 0;
+}
+
+.back-to-home:hover {
+	color: var(--primary);
+	text-decoration: none;
+	transform: translateX(-2px);
+}
+
+.catalog-table tbody tr.is-solved td:first-child {
+	box-shadow: inset 3px 0 0 var(--solved-color);
+}
+
+.problem-solved-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	flex: 0 0 20px;
+	border-radius: 50%;
+	background: var(--solved-bg);
+	color: var(--solved-color);
+	font-size: 13px;
+	font-weight: 800;
+	line-height: 1;
+}
+
+.catalog-table tbody tr.is-solved .problem-number {
+	color: var(--solved-color);
+}
+
+.open-problem.is-solved {
+	color: var(--solved-color);
+}
+
+.solved-label {
+	font-weight: 650;
+}
+
 @media (max-width: 760px) {
 	.problem-catalog {
 		padding: 16px 0 24px;
@@ -958,93 +1246,17 @@ defineExpose({ refresh });
 	}
 }
 
-:global(body.dsa-standalone-website) {
-	overflow-x: hidden !important;
-}
-
-:global(body.dsa-standalone-website > main.container) {
-	width: 100% !important;
-	max-width: none !important;
-	padding-left: 0 !important;
-	padding-right: 0 !important;
-}
-:global(body.dsa-standalone-website) {
-	margin: 0 !important;
-	padding: 0 !important;
-	overflow-x: hidden !important;
-}
-:global(body.dsa-standalone-website #page-index) {
-	margin: 0 !important;
-	padding: 0 !important;
-	width: 100% !important;
-	max-width: none !important;
-}
-.problem-catalog {
-	max-width: 1240px;
-	margin: 0 auto;
-	padding: 24px 8px 40px;
-	color: var(--text-color);
-	outline: none !important;
-}
-
-.back-to-home {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 10px;
-	padding: 6px 2px;
-	border: 0;
-	background: transparent;
-	color: var(--text-muted);
-	font-size: 12px;
-	font-weight: 600;
-	text-decoration: none;
+.problem-row {
 	cursor: pointer;
-	transition:
-		color 0.2s ease,
-		transform 0.2s ease;
 }
 
-.back-to-home svg {
-	width: 15px;
-	height: 15px;
-	flex-shrink: 0;
+.problem-row:hover {
+	background: var(--fg-hover-color);
 }
 
-.back-to-home:hover {
-	color: var(--primary);
-	text-decoration: none;
-	transform: translateX(-2px);
+.problem-row:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: -2px;
 }
 
-.catalog-table tbody tr.is-solved td:first-child {
-	box-shadow: inset 3px 0 0 var(--solved-color);
-}
-
-.problem-solved-icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 20px;
-	height: 20px;
-	flex: 0 0 20px;
-	border-radius: 50%;
-	background: var(--solved-bg);
-	color: var(--solved-color);
-	font-size: 13px;
-	font-weight: 800;
-	line-height: 1;
-}
-
-.catalog-table tbody tr.is-solved .problem-number {
-	color: var(--solved-color);
-}
-
-.open-problem.is-solved {
-	color: var(--solved-color);
-}
-
-.solved-label {
-	font-weight: 650;
-}
 </style>

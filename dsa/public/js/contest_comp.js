@@ -1,3 +1,4 @@
+
 class ContestComp {
 	constructor(wrapper, contest_name) {
         this.wrapper = wrapper;
@@ -850,7 +851,8 @@ class ContestComp {
 		return `<span class="comp-icon comp-icon-${name}">${icons[name] || ""}</span>`;
 	}
 
-	add_styles() {
+		add_styles() {
+        if (window.dsaTheme) window.dsaTheme.init();
 		if ($("#contest-comp-styles").length) return;
 
 		$("head").append(`
@@ -899,9 +901,8 @@ body.dsa-standalone-website {
     background: var(--bg-color);
 }
 
-
 @media (prefers-color-scheme: dark) {
-    body.dsa-standalone-website {
+    body.dsa-standalone-website:not([data-theme="light"]) {
         --bg-color: #161616;
         --card-bg: #1e1e1e;
         --control-bg: #252525;
@@ -940,6 +941,46 @@ body.dsa-standalone-website {
             0 2px 4px rgba(0, 0, 0, 0.30),
             0 16px 36px rgba(0, 0, 0, 0.30);
     }
+}
+
+body.dsa-standalone-website[data-theme="dark"] {
+    --bg-color: #161616;
+    --card-bg: #1e1e1e;
+    --control-bg: #252525;
+    --fg-hover-color: #303030;
+    --border-color: #3a3a3a;
+
+    --text-color: #e6e6e6;
+    --heading-color: #f0f0f0;
+    --text-muted: #999999;
+
+    --accent: #f5b82e;
+    --accent-2: #ffd45c;
+    --accent-ink: #181200;
+
+    --accent-soft: rgba(245, 184, 46, 0.14);
+    --accent-soft-strong: rgba(245, 184, 46, 0.23);
+
+    --green: #5fd68a;
+    --green-2: #7be3a1;
+    --green-soft: rgba(95, 214, 138, 0.13);
+
+    --red: #ff6b6b;
+    --red-soft: rgba(255, 107, 107, 0.12);
+
+    --blue: #6ea8fe;
+    --blue-soft: rgba(110, 168, 254, 0.14);
+
+    --silver: #aeb5bd;
+    --bronze: #d8955b;
+
+    --card-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.25),
+        0 8px 24px rgba(0, 0, 0, 0.20);
+
+    --card-shadow-hover:
+        0 2px 4px rgba(0, 0, 0, 0.30),
+        0 16px 36px rgba(0, 0, 0, 0.30);
 }
 
 

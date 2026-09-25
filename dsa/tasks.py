@@ -3,7 +3,6 @@ from frappe.utils import now_datetime
 
 
 def send_new_contest_notification(doc, method=None):
-	"""Email all enabled users when a new contest is created."""
 
 	template = frappe.get_doc("Email Template", "New Contest")
 
@@ -20,9 +19,29 @@ def send_new_contest_notification(doc, method=None):
 		context,
 	)
 
+
+	registrations = frappe.get_all(
+		"Contest Registration",
+		filters={
+			"status": "Joined",
+		},
+		fields=["user"],
+	)
+
+
+	user_names = list({
+		registration.user
+		for registration in registrations
+		if registration.user
+	})
+
+	if not user_names:
+		return
+
 	users = frappe.get_all(
 		"User",
 		filters={
+			"name": ["in", user_names],
 			"enabled": 1,
 		},
 		fields=["email"],
@@ -34,12 +53,14 @@ def send_new_contest_notification(doc, method=None):
 		if user.email
 	]
 
-	if recipients:
-		frappe.sendmail(
-			recipients=recipients,
-			subject=subject,
-			message=message,
-		)
+	if not recipients:
+		return
+
+	frappe.sendmail(
+		recipients=recipients,
+		subject=subject,
+		message=message,
+	)
 
 
 def send_contest_start_notifications():

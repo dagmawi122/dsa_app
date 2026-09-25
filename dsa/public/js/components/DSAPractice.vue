@@ -4,24 +4,36 @@
 		:class="{ 'is-standalone': props.standalone }"
 	>
 		<header v-if="!props.contestMode" class="dsa-practice-navigation">
-			
-				<a href="/list-problems" class="dsa-back-button"
-				><svg
-					aria-hidden="true"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-				>
-					<path d="m10 6-6 6 6 6M4 12h16" /></svg
-				>{{ __("Problem list") }}</a
+			<a href="/list-problems" class="dsa-back-button"
+			><svg
+				aria-hidden="true"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
 			>
+				<path d="m10 6-6 6 6 6M4 12h16" /></svg
+			>{{ __("Problem list") }}</a
+		>
 			<div class="dsa-nav-title">
 				<span>{{ __("DSA Practice") }}</span
 				><span aria-hidden="true">/</span
 				><strong>{{ problem?.title || __("Loading problem…") }}</strong>
 			</div>
 			<span class="dsa-nav-mark" aria-hidden="true">&lt;/&gt;</span>
+		</header>
+		<header v-else class="dsa-practice-navigation">
+			<a :href="contestBackLink" class="dsa-back-button dsa-back-button-gold"
+			><svg
+				aria-hidden="true"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+			>
+				<path d="m10 6-6 6 6 6M4 12h16" /></svg
+			>{{ __("Back to Contest") }}</a
+		>
 		</header>
 		<div v-if="loading" class="dsa-state">{{ __("Loading problem…") }}</div>
 		<div v-else class="dsa-practice-content">
@@ -680,6 +692,9 @@ const code = ref("");
 const busy = ref(false);
 const terminalOutput = ref("");
 const selectedLanguageId = ref(54);
+const contestBackLink = computed(() =>
+    props.contestName ? `/contest-page/${props.contestName}` : "/list-problems"
+);
 const testCases = ref([{ key: 1, input: "" }]);
 const activeTestCaseIndex = ref(0);
 const testResults = ref([]);
@@ -1162,6 +1177,7 @@ async function loadProblem(name, slug = null) {
 }
 
 onMounted(async () => {
+	if (window.dsaTheme) window.dsaTheme.init({ hideToggle: true });
 	try {
 		if (props.contestMode) {
 			if (!props.problemName) {
@@ -1536,6 +1552,17 @@ function formatMemory(memory) {
 	flex-shrink: 0;
 	padding: 8px 4px;
 }
+.dsa-back-button-gold {
+    border-color: #caa000;
+    background: rgba(202, 160, 0, 0.1);
+    color: #b8860b;
+}
+.dsa-back-button-gold:hover {
+    background: rgba(202, 160, 0, 0.18);
+    border-color: #caa000;
+    color: #96700a;
+}
+
 .dsa-back-button {
 	display: inline-flex;
 	align-items: center;
@@ -1778,11 +1805,11 @@ function formatMemory(memory) {
 .dsa-rich-text :deep(em),
 .dsa-rich-text :deep(b),
 .dsa-rich-text :deep(i) {
-    color: var(--text-color);
+	color: var(--text-color);
 }
 
 .dsa-rich-text :deep(a) {
-    color: var(--text-on-blue, #6ea8fe);
+	color: var(--text-on-blue, #6ea8fe);
 }
 
 .dsa-rich-text :deep(h1),
@@ -1791,7 +1818,7 @@ function formatMemory(memory) {
 .dsa-rich-text :deep(h4),
 .dsa-rich-text :deep(h5),
 .dsa-rich-text :deep(h6) {
-    color: var(--text-color);
+	color: var(--text-color);
 }
 
 .dsa-rich-text :deep(pre) {
@@ -1914,30 +1941,10 @@ function formatMemory(memory) {
 	gap: 5px;
 }
 
-.submission-status.accepted {
-	color: var(--text-on-green);
-}
-
-.submission-status.wrong-answer {
-	color: var(--text-on-red);
-}
-
-.submission-status.runtime-error {
-	color: var(--text-on-orange);
-}
-
-.submission-status.compilation-error {
-	color: var(--text-on-purple);
-}
-
-.submission-status.running,
-.submission-status.queued {
-	color: var(--text-on-orange);
-}
-
-.submission-status.rejected {
-	color: var(--text-on-red);
-}
+/* NOTE: status colors live in the global <style> block below
+   (single definition — see the header comment there). Nothing
+   here anymore; keeping .submission-status itself since it's
+   layout, not color. */
 
 .submission-score {
 	color: var(--text-on-orange);
@@ -2573,6 +2580,7 @@ function formatMemory(memory) {
 		height: 700px;
 	}
 }
+
 .contest-progress {
 	margin-top: 22px;
 	padding: 14px;
@@ -2657,71 +2665,180 @@ function formatMemory(memory) {
 		gap: 8px;
 	}
 }
-
-.submission-status.accepted {
-	color: var(--text-on-green);
-}
-.submission-status.wrong-answer,
-.submission-status.failed {
-	color: var(--text-on-red);
-}
-.submission-status.time-limit-exceeded {
-	color: var(--text-on-orange);
-}
-.submission-status.compilation-error {
-	color: var(--text-on-red);
-}
-.submission-status.runtime-error {
-	color: var(--text-on-red);
-}
-.submission-status.running,
-.submission-status.queued {
-	color: var(--text-on-blue);
-}
 </style>
-
 <style>
+/* ============================================================
+   DSA PRACTICE — GLOBAL LAYOUT
+   ============================================================ */
+
 body.dsa-focus-mode {
-	overflow: hidden;
+    overflow: hidden;
 }
+
 body.dsa-focus-mode .body-sidebar-container,
 body.dsa-focus-mode .main-section > header,
 body.dsa-focus-mode .dsa-editor-page .page-head {
-	display: none !important;
+    display: none !important;
 }
+
 body.dsa-focus-mode .dsa-editor-page {
-	position: fixed;
-	inset: 0;
-	z-index: 1030;
-	margin: 0;
-	padding: 0;
-	width: 100%;
-	background: var(--bg-color);
+    position: fixed;
+    inset: 0;
+    z-index: 1030;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background: var(--bg-color);
 }
+
 body.dsa-focus-mode .dsa-editor-page .page-body,
 body.dsa-focus-mode .dsa-editor-page .layout-main,
 body.dsa-focus-mode .dsa-editor-page .layout-main-section-wrapper,
 body.dsa-focus-mode .dsa-editor-page .layout-main-section {
-	margin: 0;
-	padding: 0;
-	width: 100%;
-	max-width: none;
-	border: 0;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: none;
+    border: 0;
 }
+
 .dsa-catalog-page .layout-main-section {
-	border: 0;
-	background: transparent;
+    border: 0;
+    background: transparent;
 }
+
 .dsa-page-container {
-	max-width: none !important;
-	padding-right: 6px;
-	padding-left: 6px;
+    max-width: none !important;
+    padding-right: 6px;
+    padding-left: 6px;
 }
 
 body.dsa-resizing {
-	cursor: col-resize !important;
-	user-select: none !important;
+    cursor: col-resize !important;
+    user-select: none !important;
 }
+
+
+/* ============================================================
+   LIGHT THEME
+   ============================================================ */
+
+body.dsa-focus-mode,
+body.dsa-page-mode,
+body.dsa-standalone-website,
+body.dsa-focus-mode[data-theme="light"],
+body.dsa-page-mode[data-theme="light"],
+body.dsa-standalone-website[data-theme="light"] {
+    color-scheme: light;
+
+    --bg-color: #ffffff;
+    --card-bg: #ffffff;
+    --control-bg: #f5f5f5;
+    --fg-hover-color: #eeeeee;
+    --border-color: #d9d9d9;
+
+    --text-color: #222222;
+    --text-muted: #777777;
+
+    --text-on-blue: #2563eb;
+    --text-on-green: #16a34a;
+    --text-on-red: #dc2626;
+    --text-on-orange: #d97706;
+    --text-on-purple: #7c3aed;
+
+    --color-optimal: #28c76f;
+    --color-too-complex: #e05757;
+
+    background: var(--bg-color);
+    color: var(--text-color);
+}
+
+
+/* ============================================================
+   DARK THEME
+
+   IMPORTANT:
+   This is controlled ONLY by data-theme.
+   There is deliberately NO prefers-color-scheme rule.
+   ============================================================ */
+
+body.dsa-focus-mode[data-theme="dark"],
+body.dsa-page-mode[data-theme="dark"],
+body.dsa-standalone-website[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg-color: #161616;
+    --card-bg: #1e1e1e;
+    --control-bg: #252525;
+    --fg-hover-color: #303030;
+    --border-color: #3a3a3a;
+
+    --text-color: #e6e6e6;
+    --text-muted: #999999;
+
+    --text-on-blue: #6ea8fe;
+    --text-on-green: #5fd68a;
+    --text-on-red: #ff6b6b;
+    --text-on-orange: #f5b84b;
+    --text-on-purple: #b78cff;
+}
+
+
+/* ============================================================
+   FORCE THE PRACTICE ROOT TO FOLLOW THE VARIABLES
+   ============================================================ */
+
+body.dsa-focus-mode .dsa-practice-view,
+body.dsa-page-mode .dsa-practice-view,
+body.dsa-standalone-website .dsa-practice-view {
+    background: var(--bg-color) !important;
+    color: var(--text-color) !important;
+}
+
+
+/* ============================================================
+   FORCE THE OUTER FRAPPE PAGE TO FOLLOW THE DSA THEME
+   ============================================================ */
+
+body.dsa-standalone-website #page-index,
+body.dsa-standalone-website .page-content-wrapper,
+body.dsa-standalone-website main.container,
+body.dsa-standalone-website .page_content,
+body.dsa-standalone-website .container {
+    background: var(--bg-color) !important;
+    color: var(--text-color) !important;
+}
+
+
+/* ============================================================
+   SUBMISSION STATUS
+   ============================================================ */
+
+.submission-status.accepted {
+    color: var(--text-on-green);
+}
+
+.submission-status.wrong-answer,
+.submission-status.failed,
+.submission-status.runtime-error,
+.submission-status.rejected {
+    color: var(--text-on-red);
+}
+
+.submission-status.compilation-error {
+    color: var(--text-on-purple);
+}
+
+.submission-status.time-limit-exceeded,
+.submission-status.running,
+.submission-status.queued {
+    color: var(--text-on-orange);
+}
+
+
+/* ============================================================
+   COMPLEXITY
+   ============================================================ */
 
 .complexity-result {
     display: inline-flex;
@@ -2736,93 +2853,70 @@ body.dsa-resizing {
     line-height: 1;
 }
 
-.complexity-result.optimal {
-    color: #28c76f;
+.complexity-result.optimal,
+.complexity-value.optimal {
+    color: var(--color-optimal);
 }
 
-.complexity-result.too-complex {
-    color: #e05757;
+.complexity-result.too-complex,
+.complexity-value.too-complex {
+    color: var(--color-too-complex);
     font-weight: 600;
 }
 
-.complexity-result.unknown {
-    color: #999;
+.complexity-result.unknown,
+.complexity-value.unknown {
+    color: var(--text-color);
 }
 
 .complexity-result.unknown .complexity-result-icon {
     display: none;
 }
 
-body.dsa-practice-website,
-body.dsa-standalone-website {
-	--bg-color: #ffffff;
-	--card-bg: #ffffff;
-	--control-bg: #f5f5f5;
-	--fg-hover-color: #eeeeee;
-	--border-color: #d9d9d9;
-
-	--text-color: #222222;
-	--text-muted: #777777;
-
-	--text-on-blue: #2563eb;
-	--text-on-green: #16a34a;
-	--text-on-red: #dc2626;
-	--text-on-orange: #d97706;
-	--text-on-purple: #7c3aed;
-
-	background: var(--bg-color);
-	color: var(--text-color);
-}
-
-@media (prefers-color-scheme: dark) {
-	body.dsa-practice-website,
-	body.dsa-standalone-website {
-		--bg-color: #161616;
-		--card-bg: #1e1e1e;
-		--control-bg: #252525;
-		--fg-hover-color: #303030;
-		--border-color: #3a3a3a;
-
-		--text-color: #e6e6e6;
-		--text-muted: #999999;
-
-		--text-on-blue: #6ea8fe;
-		--text-on-green: #5fd68a;
-		--text-on-red: #ff6b6b;
-		--text-on-orange: #f5b84b;
-		--text-on-purple: #b78cff;
-	}
-}
-
-body.dsa-practice-website .dsa-practice-view,
-body.dsa-standalone-website .dsa-practice-view {
-	background: var(--bg-color) !important;
-	color: var(--text-color) !important;
-}
-
-.dsa-timer.is-frozen {
-	border-color: #1c7a43;
-	color: var(--text-on-green);
+.complexity-value {
+    font-weight: 600;
+    font-family: var(--font-stack-monospace);
 }
 
 .dsa-complexity-row span {
-	color: var(--text-color);
+    color: var(--text-color);
 }
 
-.complexity-value {
-	font-weight: 600;
-	font-family: var(--font-stack-monospace);
+.dsa-timer.is-frozen {
+    border-color: var(--text-on-green);
+    color: var(--text-on-green);
 }
 
-.complexity-value.optimal {
-	color: #28c76f;
+
+/* ============================================================
+   FINAL THEME OVERRIDE
+
+   This MUST remain at the bottom.
+   ============================================================ */
+
+body.dsa-standalone-website[data-theme="light"],
+body.dsa-practice-website[data-theme="light"],
+body.dsa-page-mode[data-theme="light"],
+body.dsa-focus-mode[data-theme="light"] {
+    --bg-color: #ffffff !important;
+    --card-bg: #ffffff !important;
+    --control-bg: #f5f5f5 !important;
+    --fg-hover-color: #eeeeee !important;
+    --border-color: #d9d9d9 !important;
+    --text-color: #222222 !important;
+    --text-muted: #777777 !important;
 }
 
-.complexity-value.too-complex {
-	color: #e05757;
-}
-
-.complexity-value.unknown {
-	color: var(--text-color);
+body.dsa-standalone-website[data-theme="dark"],
+body.dsa-practice-website[data-theme="dark"],
+body.dsa-page-mode[data-theme="dark"],
+body.dsa-focus-mode[data-theme="dark"] {
+    --bg-color: #161616 !important;
+    --card-bg: #1e1e1e !important;
+    --control-bg: #252525 !important;
+    --fg-hover-color: #303030 !important;
+    --border-color: #3a3a3a !important;
+    --text-color: #e6e6e6 !important;
+    --text-muted: #999999 !important;
 }
 </style>

@@ -1,9 +1,15 @@
+
 class ContestPage {
 	constructor(wrapper, contest_name) {
 		this.wrapper = wrapper;
 
 		this.contest_name = contest_name;
 		this.add_styles();
+
+		window.addEventListener("popstate", () => {
+			const parts = window.location.pathname.split("/").filter(Boolean);
+			this.handle_route_change(parts[1] || null);
+		});
 
 		if (this.contest_name) {
 			this.render_details();
@@ -24,6 +30,11 @@ class ContestPage {
 			this.render_listing();
 			this.load_contests();
 		}
+	}
+
+	navigate(path, contest_name) {
+		window.history.pushState({}, "", path);
+		this.handle_route_change(contest_name);
 	}
 
 	render_listing() {
@@ -357,7 +368,7 @@ class ContestPage {
 	}
 
 	open_contest(contest_name) {
-		window.location.href = `/contest-page/${contest_name}`;
+		this.navigate(`/contest-page/${contest_name}`, contest_name);
 	}
 
 	render_details() {
@@ -377,6 +388,10 @@ class ContestPage {
                 </div>
             </div>
         `);
+
+		$(".back-to-contests").on("click", () => {
+			this.navigate("/contest-page", null);
+		});
 	}
 
 	async load_contest() {
@@ -752,7 +767,7 @@ class ContestPage {
 
 	bind_details_events(contest, isRegistered) {
 		$(".back-to-contests").on("click", () => {
-			window.location.href = "/contest-page"
+			this.navigate("/contest-page", null);
 		});
 
 		$(".contest-enter-btn").on("click", () => {
@@ -1058,7 +1073,7 @@ class ContestPage {
 
 		$(".back-to-contests").on(
 			"click",
-			() => window.location.href = "/contest-page"
+			() => this.navigate("/contest-page", null)
 		);
 	}
 
@@ -1091,7 +1106,7 @@ class ContestPage {
 
 		$(".back-to-contests").on(
 			"click",
-			() => window.location.href = "/contest-page"
+			() => this.navigate("/contest-page", null)
 		);
 
 		$(".contest-retry").on(
@@ -1212,13 +1227,12 @@ class ContestPage {
 		}</span>`;
 	}
 
-	add_styles() {
+		add_styles() {
+        if (window.dsaTheme) window.dsaTheme.init();
 		if ($("#contest-page-styles").length) return;
 
 		$("head").append(`
 <style id="contest-page-styles">
-
-
 
 body.dsa-standalone-website {
     --bg-color: #ffffff;
@@ -1260,9 +1274,8 @@ body.dsa-standalone-website {
     background: var(--bg-color);
 }
 
-
 @media (prefers-color-scheme: dark) {
-    body.dsa-standalone-website {
+    body.dsa-standalone-website:not([data-theme="light"]) {
         --bg-color: #161616;
         --card-bg: #1e1e1e;
         --control-bg: #252525;
@@ -1300,6 +1313,42 @@ body.dsa-standalone-website {
     }
 }
 
+body.dsa-standalone-website[data-theme="dark"] {
+    --bg-color: #161616;
+    --card-bg: #1e1e1e;
+    --control-bg: #252525;
+    --fg-hover-color: #303030;
+    --border-color: #3a3a3a;
+
+    --text-color: #e6e6e6;
+    --heading-color: #f0f0f0;
+    --text-muted: #999999;
+
+    --accent: #f5b82e;
+    --accent-2: #ffd45c;
+    --accent-ink: #181200;
+
+    --accent-soft: rgba(245, 184, 46, 0.14);
+    --accent-soft-strong: rgba(245, 184, 46, 0.23);
+
+    --green: #5fd68a;
+    --green-2: #7be3a1;
+    --green-soft: rgba(95, 214, 138, 0.13);
+
+    --red: #ff6b6b;
+    --red-soft: rgba(255, 107, 107, 0.12);
+
+    --silver: #aeb5bd;
+    --bronze: #d8955b;
+
+    --card-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.25),
+        0 8px 24px rgba(0, 0, 0, 0.20);
+
+    --card-shadow-hover:
+        0 2px 4px rgba(0, 0, 0, 0.30),
+        0 16px 36px rgba(0, 0, 0, 0.30);
+}
 
 .contest-page {
     min-height: 100vh;
@@ -1354,19 +1403,6 @@ body.dsa-standalone-website {
 
 .page-container {
     background: var(--bg-color) !important;
-}
-
-.contest-page {
-    min-height: 100vh;
-    padding: 30px;
-    max-width: 1400px;
-    margin: 0 auto;
-    color: var(--text-color);
-    font-family: var(--font-stack, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-    background:
-        radial-gradient(720px 320px at 12% -8%, var(--accent-soft), transparent 60%),
-        radial-gradient(600px 280px at 100% 0%, var(--green-soft), transparent 55%),
-        var(--bg-color);
 }
 
 .contest-hero {

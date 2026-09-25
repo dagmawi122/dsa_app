@@ -367,7 +367,7 @@ def run_code(
         test_case_index,
     )
 
-    time_complexity = _estimate_time_complexity(code)
+    time_complexity = _estimate_time_complexity(code, language_id)
     space_complexity = _estimate_space_complexity(code)
 
     time_complexity_result = _compare_complexity(
@@ -446,7 +446,7 @@ def _create_dsa_submission(
 
 	language_id = cint(language_id)
 
-	time_complexity = _estimate_time_complexity(code)
+	time_complexity = _estimate_time_complexity(code, language_id)
 	space_complexity = _estimate_space_complexity(code)
 
 	time_complexity_result = _compare_complexity(
@@ -653,7 +653,7 @@ def submit_contest_code(
 		problem,
 	)
 
-	time_complexity = _estimate_time_complexity(code)
+	time_complexity = _estimate_time_complexity(code, language_id)
 	space_complexity = _estimate_space_complexity(code)
 
 	time_complexity_result = _compare_complexity(
@@ -1424,7 +1424,7 @@ def submit_code(
 		problem,
 	)
 
-	time_complexity = _estimate_time_complexity(code)
+	time_complexity = _estimate_time_complexity(code, language_id)
 	space_complexity = _estimate_space_complexity(code)
 
 	time_complexity_result = _compare_complexity(
@@ -1594,13 +1594,398 @@ def get_submission_result(submission: str) -> dict[str, Any]:
 		frappe.throw(_("You cannot view this submission."), frappe.PermissionError)
 	return _refresh_submission(doc)
 
-def _estimate_time_complexity(code: str) -> str:
+def _estimate_time_complexity(code: str, language_id: int) -> str:
+    """
+    Estimate time complexity from source code.
+
+    Language IDs:
+        54 = C++ (GCC)
+        71 = Python
+        63 = JavaScript
+        62 = Java
+    """
+
+    language_id = cint(language_id)
+
+    # ============================================================
+    # PYTHON
+    # ============================================================
+    if language_id == 71:
+        # --------------------------------------------------------
+        # Remove Python comments.
+        # --------------------------------------------------------
+        code = re.sub(r"#.*", "", code)
+
+        # Remove triple-quoted strings/docstrings so that things
+        # inside them are not mistaken for executable code.
+        code = re.sub(
+            r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')',
+            "",
+            code,
+        )
+
+        # --------------------------------------------------------
+        # O(log n)
+        #
+        # Examples:
+        #
+        # while n > 1:
+        #     n //= 2
+        #
+        # while n > 1:
+        #     n = n // 2
+        #
+        # while n >= 1:
+        #     n //= 2
+        # --------------------------------------------------------
+
+        if re.search(
+            r"\bwhile\s+[^:\n]*\b"
+            r"(?://=|/=|\*=)\s*2\b[^:\n]*:",
+            code,
+        ):
+            return "O(log n)"
+
+        if re.search(
+            r"\bwhile\s+[^:\n]*:\s*"
+            r"(?:\n[ \t]+)+"
+            r"[A-Za-z_]\w*\s*=\s*[A-Za-z_]\w*\s*//\s*2",
+            code,
+        ):
+            return "O(log n)"
+
+        # n = n // 2 / n = n / 2 / n //= 2
+        if re.search(
+            r"\b[A-Za-z_]\w*\s*=\s*[A-Za-z_]\w*\s*//\s*2\b",
+            code,
+        ) and re.search(r"\bwhile\b", code):
+            return "O(log n)"
+
+        if re.search(
+            r"\b[A-Za-z_]\w*\s*=\s*[A-Za-z_]\w*\s*/\s*2\b",
+            code,
+        ) and re.search(r"\bwhile\b", code):
+            return "O(log n)"
+
+        # --------------------------------------------------------
+        # Binary-search style loops.
+        #
+        # Example:
+        #
+        # while low <= high:
+        #     mid = (low + high) // 2
+        # --------------------------------------------------------
+
+        if re.search(
+            r"\bwhile\s+[^:\n]*\b"
+            r"(low|high|left|right|lo|hi)\b"
+            r"[^:\n]*:",
+            code,
+        ):
+            if re.search(
+                r"\b(mid|middle)\b\s*=\s*"
+                r"\([^)]*\)\s*//\s*2",
+                code,
+            ):
+                return "O(log n)"
+
+        # More general Python binary-search midpoint detection.
+        if re.search(
+            r"\b(mid|middle)\b\s*=\s*"
+            r"[^:\n]*//\s*2",
+            code,
+        ):
+            if re.search(r"\bwhile\b", code):
+                return "O(log n)"
+
+        # --------------------------------------------------------
+        # O(n log n)
+        #
+        # Python:
+        #   items.sort()
+        #   sorted(items)
+        #   sorted(items, key=...)
+        # --------------------------------------------------------
+
+        if re.search(
+            r"\.\s*sort\s*\(",
+            code,
+        ):
+            return "O(n log n)"
+
+        if re.search(
+            r"\bsorted\s*\(",
+            code,
+        ):
+            return "O(n log n)"
+
+        # --------------------------------------------------------
+        # Python recursion.
+        #
+        # Example:
+        #
+        # def factorial(n):
+        #     if n <= 1:
+        #         return 1
+        #     return n * factorial(n - 1)
+        #
+        # -> O(n)
+        #
+        # Example:
+        #
+        # def fib(n):
+        #     return fib(n - 1) + fib(n - 2)
+        #
+        # -> O(2^n)
+        # --------------------------------------------------------
+
+        function_pattern = re.compile(
+            r"(?m)^[ \t]*def\s+([A-Za-z_]\w*)\s*\([^)]*\)\s*:"
+        )
+
+        for match in function_pattern.finditer(code):
+            function_name = match.group(1)
+
+            function_start = match.end()
+
+            # Python functions are indentation-based.
+            # Determine the indentation level of the def.
+            line_start = code.rfind("\n", 0, match.start()) + 1
+            def_line = code[line_start:match.start()]
+
+            base_indent = len(def_line.expandtabs(4))
+
+            # Find the next function/class at the same indentation
+            # level. That marks the end of this function.
+            next_definition = None
+
+            for next_match in function_pattern.finditer(
+                code,
+                function_start,
+            ):
+                next_line_start = (
+                    code.rfind("\n", 0, next_match.start()) + 1
+                )
+
+                next_prefix = code[
+                    next_line_start:next_match.start()
+                ]
+
+                next_indent = len(
+                    next_prefix.expandtabs(4)
+                )
+
+                if next_indent <= base_indent:
+                    next_definition = next_match.start()
+                    break
+
+            function_body = (
+                code[function_start:next_definition]
+                if next_definition is not None
+                else code[function_start:]
+            )
+
+            recursive_calls = re.findall(
+                rf"\b{re.escape(function_name)}\s*\(",
+                function_body,
+            )
+
+            if recursive_calls:
+                # Recursive call inside a loop can grow much faster.
+                if re.search(
+                    r"(?m)^[ \t]*(?:for|while)\b[^:]*:",
+                    function_body,
+                ):
+                    return "O(n!)"
+
+                # Two or more recursive calls are treated as
+                # exponential, preserving the behavior of the
+                # previous analyzer.
+                if len(recursive_calls) >= 2:
+                    return "O(2^n)"
+
+                return "O(n)"
+
+        # --------------------------------------------------------
+        # Python loops.
+        #
+        # Examples:
+        #
+        # for i in range(n):
+        #     ...
+        #
+        # for i in range(n):
+        #     for j in range(n):
+        #         ...
+        #
+        # for i in range(0, n, 2):
+        #     ...
+        # --------------------------------------------------------
+
+        python_loops = []
+
+        # Match Python for loops and their indentation.
+        for match in re.finditer(
+            r"(?m)^([ \t]*)for\s+.+?\s+in\s+(.+?):\s*$",
+            code,
+        ):
+            indentation = len(
+                match.group(1).expandtabs(4)
+            )
+
+            expression = match.group(2).strip()
+
+            # ----------------------------------------------------
+            # Determine whether this is a constant-size loop.
+            #
+            # range(10)
+            # range(0, 10)
+            # range(1, 10)
+            # ----------------------------------------------------
+
+            constant_loop = bool(
+                re.fullmatch(
+                    r"range\s*\(\s*"
+                    r"(?:[-+]?\d+\s*,\s*)?"
+                    r"[-+]?\d+\s*"
+                    r"(?:,\s*[-+]?\d+\s*)?"
+                    r"\)",
+                    expression,
+                )
+            )
+
+            # ----------------------------------------------------
+            # range(n), range(len(arr)), range(0, n), etc.
+            # are variable loops.
+            # ----------------------------------------------------
+
+            python_loops.append(
+                {
+                    "start": match.start(),
+                    "body_start": match.end(),
+                    "indent": indentation,
+                    "constant": constant_loop,
+                }
+            )
+
+        # --------------------------------------------------------
+        # Python while loops.
+        # --------------------------------------------------------
+
+        for match in re.finditer(
+            r"(?m)^([ \t]*)while\s+.+?:\s*$",
+            code,
+        ):
+            indentation = len(
+                match.group(1).expandtabs(4)
+            )
+
+            condition = match.group(0)
+
+            # A while loop is assumed variable unless it is clearly
+            # impossible to depend on input.
+            constant_loop = bool(
+                re.search(
+                    r"\b(?:False|0)\b",
+                    condition,
+                )
+            )
+
+            python_loops.append(
+                {
+                    "start": match.start(),
+                    "body_start": match.end(),
+                    "indent": indentation,
+                    "constant": constant_loop,
+                }
+            )
+
+        # --------------------------------------------------------
+        # Calculate nested-loop depth using Python indentation.
+        #
+        # We don't rely only on textual nesting because Python uses
+        # indentation instead of braces.
+        # --------------------------------------------------------
+
+        variable_loops = [
+            loop
+            for loop in python_loops
+            if not loop["constant"]
+        ]
+
+        max_loop_depth = 0
+
+        for loop in variable_loops:
+            depth = 1
+
+            for other in variable_loops:
+                if (
+                    other["start"] > loop["start"]
+                    and other["indent"] > loop["indent"]
+                ):
+                    # Determine whether `other` is actually inside
+                    # the body of `loop`.
+                    loop_index = python_loops.index(loop)
+
+                    next_same_or_lower = None
+
+                    for following in python_loops[
+                        loop_index + 1:
+                    ]:
+                        if following["indent"] <= loop["indent"]:
+                            next_same_or_lower = following[
+                                "start"
+                            ]
+                            break
+
+                    if (
+                        next_same_or_lower is None
+                        or other["start"] < next_same_or_lower
+                    ):
+                        depth += 1
+
+            max_loop_depth = max(
+                max_loop_depth,
+                depth,
+            )
+
+        if max_loop_depth >= 3:
+            return "O(n³)"
+
+        if max_loop_depth == 2:
+            return "O(n²)"
+
+        if max_loop_depth == 1:
+            return "O(n)"
+
+        return "O(1)"
+
+    # ============================================================
+    # EXISTING C/C++ / JAVA / JAVASCRIPT LOGIC
+    # ============================================================
+    #
+    # Keep the previous analyzer for:
+    #   54 = C++
+    #   63 = JavaScript
+    #   62 = Java
+    #
+    # ============================================================
+
     code = re.sub(r"//.*", "", code)
-    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+    code = re.sub(
+        r"/\*.*?\*/",
+        "",
+        code,
+        flags=re.DOTALL,
+    )
+
+    # ------------------------------------------------------------
+    # O(log n)
+    # ------------------------------------------------------------
 
     if re.search(
         r"\b(for|while)\s*\([^)]*\b(i|j|k|n|size|len|length)\b[^)]*"
-        r"(?:\*=|/=)\s*\d+",
+        r"(?:\+=|-=|/=|\*=)\s*\d+",
         code,
     ):
         return "O(log n)"
@@ -1626,15 +2011,23 @@ def _estimate_time_complexity(code: str) -> str:
     ):
         return "O(log n)"
 
+    # ------------------------------------------------------------
+    # O(n log n)
+    # ------------------------------------------------------------
+
     if re.search(
         r"\b(sort|stable_sort)\s*\(",
         code,
     ):
         return "O(n log n)"
 
+    # ------------------------------------------------------------
+    # Recursive functions
+    # ------------------------------------------------------------
+
     function_pattern = re.compile(
-        r"(?:^|[;\}])\s*"
-        r"(?:[A-Za-z_][\w:<>,\s\*&]*?)\s+"
+        r"(?:^|[;{}])\s*"
+        r"(?:[A-Za-z_][\w:<>,\s*&]*?)\s+"
         r"(\w+)\s*\([^)]*\)\s*\{",
         re.MULTILINE,
     )
@@ -1643,6 +2036,7 @@ def _estimate_time_complexity(code: str) -> str:
         function_name = match.group(1)
 
         brace_pos = match.end() - 1
+
         depth = 1
         i = brace_pos + 1
 
@@ -1653,7 +2047,9 @@ def _estimate_time_complexity(code: str) -> str:
                 depth -= 1
             i += 1
 
-        function_body = code[match.end():i - 1]
+        function_body = code[
+            match.end():i - 1
+        ]
 
         recursive_calls = re.findall(
             rf"\b{re.escape(function_name)}\s*\(",
@@ -1670,7 +2066,11 @@ def _estimate_time_complexity(code: str) -> str:
                 function_body,
             ):
                 loop_start = loop_match.end()
-                brace_pos = function_body.find("{", loop_start)
+
+                brace_pos = function_body.find(
+                    "{",
+                    loop_start,
+                )
 
                 if brace_pos == -1:
                     continue
@@ -1683,11 +2083,16 @@ def _estimate_time_complexity(code: str) -> str:
                         depth += 1
                     elif function_body[j] == "}":
                         depth -= 1
+
                     j += 1
 
-                loop_body = function_body[brace_pos:j]
+                loop_body = function_body[
+                    brace_pos:j
+                ]
 
-                if recursive_call_pattern.search(loop_body):
+                if recursive_call_pattern.search(
+                    loop_body
+                ):
                     return "O(n!)"
 
             if len(recursive_calls) >= 2:
@@ -1695,22 +2100,39 @@ def _estimate_time_complexity(code: str) -> str:
 
             return "O(n)"
 
-    loop_pattern = re.compile(r"\b(for|while)\s*\(")
+    # ------------------------------------------------------------
+    # Existing C-style loop analysis
+    # ------------------------------------------------------------
+
+    loop_pattern = re.compile(
+        r"\b(for|while)\s*\("
+    )
+
     loops = []
 
     for match in loop_pattern.finditer(code):
-        # Find the end of the loop's own parenthesized condition, not just
-        # any "(" — this matters for nested parens like for(int i=0;i<f(n);i++).
-        paren_start = code.find("(", match.end() - 1)
+
+        # Find the end of the loop's own parenthesized
+        # condition, not just any "(".
+        paren_start = code.find(
+            "(",
+            match.end() - 1,
+        )
+
         depth = 1
         i = paren_start + 1
+
         while i < len(code) and depth:
             if code[i] == "(":
                 depth += 1
             elif code[i] == ")":
                 depth -= 1
+
             i += 1
-        header = code[match.start():i]
+
+        header = code[
+            match.start():i
+        ]
 
         constant_loop = bool(
             re.search(
@@ -1719,28 +2141,41 @@ def _estimate_time_complexity(code: str) -> str:
             )
         )
 
-        # Skip whitespace/newlines after the ")" to see what follows.
+        # Skip whitespace/newlines after ")".
         j = i
+
         while j < len(code) and code[j] in " \t\r\n":
             j += 1
 
         if j < len(code) and code[j] == "{":
+
             brace_pos = j
+
             depth = 1
             k = brace_pos + 1
+
             while k < len(code) and depth:
                 if code[k] == "{":
                     depth += 1
                 elif code[k] == "}":
                     depth -= 1
+
                 k += 1
+
             body_start = brace_pos
             body_end = k
+
         else:
-            # Brace-less loop body: a single statement up to the next ";".
+            # Brace-less loop body:
+            # a single statement up to the next ";"
             stmt_end = code.find(";", j)
+
             body_start = j
-            body_end = stmt_end + 1 if stmt_end != -1 else len(code)
+            body_end = (
+                stmt_end + 1
+                if stmt_end != -1
+                else len(code)
+            )
 
         loops.append(
             {
@@ -1752,23 +2187,29 @@ def _estimate_time_complexity(code: str) -> str:
         )
 
     variable_loops = [
-        loop for loop in loops
+        loop
+        for loop in loops
         if not loop["constant"]
     ]
 
     max_loop_depth = 0
 
     for loop in variable_loops:
+
         depth = 1
 
         for other in variable_loops:
+
             if (
                 other["body_start"] > loop["body_start"]
                 and other["end"] < loop["end"]
             ):
                 depth += 1
 
-        max_loop_depth = max(max_loop_depth, depth)
+        max_loop_depth = max(
+            max_loop_depth,
+            depth,
+        )
 
     if max_loop_depth >= 3:
         return "O(n³)"

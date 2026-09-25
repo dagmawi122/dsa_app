@@ -293,3 +293,11 @@ fixtures = [
         ]
     }
 ]
+
+app_include_js = [
+	"/assets/dsa/js/theme.js",
+]
+
+web_include_js = [
+	"/assets/dsa/js/theme.js",
+]
