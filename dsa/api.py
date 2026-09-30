@@ -303,41 +303,33 @@ def get_contest(name: str) -> dict[str, Any]:
 
 @frappe.whitelist()
 def get_submissions(problem: str) -> list[dict[str, Any]]:
-	"""Return only the signed-in user's submissions for the selected problem."""
-	user = _require_login()
-	# Recover submissions whose browser polling was interrupted by a refresh,
-	# navigation, closed tab, or stale frontend bundle.
-	unfinished = frappe.get_all(
-		"DSA Submission",
-		filters={"problem": problem, "member": user, "status": ["in", ["Queued", "Running"]]},
-		pluck="name",
-		order_by="creation desc",
-		limit_page_length=10,
-	)
-	for submission_name in unfinished:
-		_refresh_submission(frappe.get_doc("DSA Submission", submission_name))
+    """Return the signed-in user's submissions for the selected problem."""
+    user = _require_login()
 
-	return frappe.get_all(
-		"DSA Submission",
-		filters={"problem": problem, "member": user},
-		fields=[
-			"name",
-			"status",
-			"passed_count",
-			"total_count",
-			"code",
-			"language_id",
-			"creation",
-			"runtime",
-			"memory",
-			"time_complexity",
-			"space_complexity",
-			"complexity_result",
-			"space_complexity_result",
-		],
-		order_by="creation desc",
-		limit_page_length=50,
-	)
+    return frappe.get_all(
+        "DSA Submission",
+        filters={
+            "problem": problem,
+            "member": user,
+        },
+        fields=[
+            "name",
+            "status",
+            "passed_count",
+            "total_count",
+            "code",
+            "language_id",
+            "creation",
+            "runtime",
+            "memory",
+            "time_complexity",
+            "space_complexity",
+            "complexity_result",
+            "space_complexity_result",
+        ],
+        order_by="creation desc",
+        limit_page_length=50,
+    )
 
 
 
@@ -1451,9 +1443,15 @@ def submit_code(
 		language_id=language_id,
 	)
 
+	frappe.enqueue(
+		"dsa.tasks.process_dsa_submission",
+		submission_name=submission.name,
+		queue="short",
+		enqueue_after_commit=True,
+	)
+
 	return {
 		"submission": submission.name,
-		"status": submission.status,
 		"complexity": time_complexity,
 		"space_complexity": space_complexity,
 		"complexity_result": time_complexity_result,

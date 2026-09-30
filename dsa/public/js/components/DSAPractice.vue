@@ -188,10 +188,10 @@
 								<div class="dsa-submission-main">
 									<strong
 										class="submission-status"
-										:class="statusClass(submission.status)"
+										:class="statusClass(submissionStatus(submission))"
 									>
-										<span>{{ statusIcon(submission.status) }}</span>
-										{{ displayStatus(submission.status) }}
+										<span>{{ statusIcon(submissionStatus(submission)) }}</span>
+										{{ displayStatus(submissionStatus(submission)) }}
 									</strong>
 
 									<span v-if="props.contestMode" class="submission-score">
@@ -823,7 +823,7 @@ function statusIcon(status) {
 		return "!";
 	}
 
-	if (normalized === "rejected") {
+	if (normalized === "rejected" || normalized.includes("complexity exceeded")) {
 		return "⚠";
 	}
 
@@ -871,6 +871,41 @@ function complexityResultIcon(result) {
 // passed — if either the time or space complexity came back "Too Complex".
 function isComplexityRejected(...results) {
 	return results.some((result) => result === "Too Complex");
+}
+
+// Returns a specific status label describing WHICH complexity was exceeded,
+// or null when neither time nor space complexity was rejected. Used in place
+// of the generic "Rejected" label for both run and submit.
+function complexityRejectionLabel(timeResult, spaceResult) {
+	const timeExceeded = timeResult === "Too Complex";
+	const spaceExceeded = spaceResult === "Too Complex";
+
+	if (timeExceeded && spaceExceeded) {
+		return __("Time & Space Complexity Exceeded");
+	}
+
+	if (timeExceeded) {
+		return __("Time Complexity Exceeded");
+	}
+
+	if (spaceExceeded) {
+		return __("Space Complexity Exceeded");
+	}
+
+	return null;
+}
+
+// Effective status shown for a saved submission: if the time and/or space
+// complexity was "Too Complex", show which one was exceeded instead of the
+// raw backend status (e.g. "Wrong Answer"). Wrong Answer is then only shown
+// for genuinely wrong answers.
+function submissionStatus(submission) {
+	return (
+		complexityRejectionLabel(
+			submission?.complexity_result,
+			submission?.space_complexity_result
+		) || submission?.status
+	);
 }
 
 function formatSubmissionTime(submission) {
@@ -1239,14 +1274,13 @@ async function runCode() {
 				complexityResult.value = queued.complexity_result || "";
 				spaceComplexityResult.value = queued.space_complexity_result || "";
 
-				const complexityRejected = isComplexityRejected(
+				const complexityLabel = complexityRejectionLabel(
 					complexityResult.value,
 					spaceComplexityResult.value
 				);
 
-				overallStatus.value = complexityRejected
-					? "Rejected"
-					: result.status || __("Finished");
+				overallStatus.value =
+					complexityLabel || result.status || __("Finished");
 
 				resultRuntime.value = result.time
 					? formatRuntime(result.time)
@@ -1257,7 +1291,7 @@ async function runCode() {
 				testResults.value = [
 					{
 						index: activeTestCaseIndex.value + 1,
-						status: complexityRejected ? "Rejected" : result.status,
+						status: complexityLabel || result.status,
 						input,
 						expected_output: result.expected_output,
 						actual_output: result.stdout,
@@ -1362,19 +1396,27 @@ async function submitCode() {
                 queued.space_complexity_result ||
                 "";
 
-            // A submission is Rejected the moment either complexity metric
+            // A submission is flagged the moment either complexity metric
             // comes back "Too Complex" — this overrides the raw judge
             // status (which may otherwise say "Accepted" purely on
             // correctness) the same way runCode() already does for a
-            // single test run.
+            // single test run. The status names which complexity was
+            // exceeded (time, space, or both).
             const complexityRejected = isComplexityRejected(
                 complexityResult.value,
                 spaceComplexityResult.value
             );
 
-            overallStatus.value = complexityRejected
-                ? "Rejected"
-                : result.display_status || result.status || __("Finished");
+            const complexityLabel = complexityRejectionLabel(
+                complexityResult.value,
+                spaceComplexityResult.value
+            );
+
+            overallStatus.value =
+                complexityLabel ||
+                result.display_status ||
+                result.status ||
+                __("Finished");
 
             resultRuntime.value = result.runtime
                 ? formatRuntime(result.runtime)
@@ -1385,8 +1427,8 @@ async function submitCode() {
 				: resultMemory.value;
 
             testResults.value = (result.results || []).map((testResult) =>
-                complexityRejected
-                    ? { ...testResult, status: "Rejected" }
+                complexityLabel
+                    ? { ...testResult, status: complexityLabel }
                     : testResult
             );
 
@@ -2822,6 +2864,10 @@ body.dsa-standalone-website .container {
 .submission-status.failed,
 .submission-status.runtime-error,
 .submission-status.rejected {
+    color: var(--text-on-red);
+}
+
+.submission-status[class*="complexity-exceeded"] {
     color: var(--text-on-red);
 }
 

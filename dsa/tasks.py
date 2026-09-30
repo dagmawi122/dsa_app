@@ -2,6 +2,34 @@ import frappe
 from frappe.utils import now_datetime
 
 
+def process_dsa_submission(submission_name):
+	"""
+	Process a DSA submission in the background.
+
+	The job checks Judge0 once. If the submission is still pending,
+	it queues another short job instead of keeping the worker occupied.
+	"""
+
+	doc = frappe.get_doc("DSA Submission", submission_name)
+
+	# Don't process submissions that are already finished.
+	if doc.status in {"Accepted", "Failed"}:
+		return
+
+	from dsa.api import _refresh_submission
+
+	result = _refresh_submission(doc)
+
+	# Judge0 is still processing the test cases.
+	if result["pending"]:
+		frappe.enqueue(
+			"dsa.tasks.process_dsa_submission",
+			submission_name=submission_name,
+			queue="short",
+			enqueue_after_commit=True,
+		)
+
+
 def send_new_contest_notification(doc, method=None):
 
 	template = frappe.get_doc("Email Template", "New Contest")
@@ -137,3 +165,4 @@ def send_contest_start_notifications():
 			subject=subject,
 			message=message,
 		)
+

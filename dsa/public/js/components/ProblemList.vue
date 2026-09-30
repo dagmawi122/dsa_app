@@ -398,9 +398,14 @@
 		</div>
 	</section>
 </template>
-
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import {
+	computed,
+	onBeforeUnmount,
+	onMounted,
+	ref,
+	watch,
+} from "vue";
 
 const __ = window.__;
 
@@ -534,7 +539,28 @@ async function refresh() {
 	}
 }
 
-onMounted(refresh);
+
+function handleVisibilityChange() {
+	if (document.visibilityState === "visible") {
+		refresh();
+	}
+}
+
+onMounted(() => {
+	refresh();
+
+	document.addEventListener(
+		"visibilitychange",
+		handleVisibilityChange
+	);
+});
+
+onBeforeUnmount(() => {
+	document.removeEventListener(
+		"visibilitychange",
+		handleVisibilityChange
+	);
+});
 
 defineExpose({ refresh });
 </script>

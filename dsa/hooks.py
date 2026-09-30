@@ -164,8 +164,13 @@ doc_events = {
 # ---------------
 
 scheduler_events = {
+	"cron": {
+		"*/1 * * * *": [
+			"dsa.tasks.process_pending_submissions",
+		],
+	},
 	"daily": [
-		"dsa.tasks.send_contest_start_notifications"
+		"dsa.tasks.send_contest_start_notifications",
 	],
 }
 
