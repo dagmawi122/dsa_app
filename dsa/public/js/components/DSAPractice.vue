@@ -20,7 +20,18 @@
 				><span aria-hidden="true">/</span
 				><strong>{{ problem?.title || __("Loading problem…") }}</strong>
 			</div>
-			<span class="dsa-nav-mark" aria-hidden="true">&lt;/&gt;</span>
+			<div class="dsa-nav-right">
+				<!-- Total XP. The backend is the source of truth; this only displays it. -->
+				<span
+					v-if="xpLoaded"
+					class="dsa-xp-chip"
+					:title="__('Your total XP')"
+				>
+					<span class="dsa-xp-chip-label">{{ __("XP") }}</span>
+					<strong>{{ xpTotal }}</strong>
+				</span>
+				<span class="dsa-nav-mark" aria-hidden="true">&lt;/&gt;</span>
+			</div>
 		</header>
 		<header v-else class="dsa-practice-navigation">
 			<a :href="contestBackLink" class="dsa-back-button dsa-back-button-gold"
@@ -73,6 +84,18 @@
 
 							<div class="dsa-meta">
 								<span class="dsa-difficulty">{{ problem.difficulty }}</span>
+								<span
+									v-if="!props.contestMode && problem.xp_reward > 0"
+									class="dsa-chip dsa-chip-xp"
+								>
+									{{ problem.xp_reward }} XP
+								</span>
+								<span
+									v-if="!props.contestMode && problem.solved"
+									class="dsa-chip dsa-chip-solved"
+								>
+									✓ {{ __("Solved") }}
+								</span>
 								<details class="dsa-problem-topics">
 									<summary class="dsa-chip">◇ {{ __("Topics") }}</summary>
 									<div class="dsa-topic-links">
@@ -497,6 +520,30 @@
 											</span>
 										</div>
 
+										<!--
+											XP outcome of this submission. Everything here comes from the
+											backend's `xp` object; the browser never infers it from status.
+										-->
+										<div
+											v-if="resultXp && resultXp.awarded"
+											class="dsa-xp-line is-awarded"
+										>
+											<strong>+{{ resultXp.gained }} XP</strong>
+											<span>{{ __("Total XP") }}: {{ resultXp.total }}</span>
+										</div>
+										<div
+											v-else-if="resultXp && resultXp.already_awarded"
+											class="dsa-xp-line"
+										>
+											<span>{{ __("Already solved") }}</span>
+										</div>
+										<div
+											v-else-if="resultXp && resultXp.error"
+											class="dsa-xp-line is-error"
+										>
+											<span>{{ resultXp.error }}</span>
+										</div>
+
 										<div
 											v-if="resultComplexity || resultSpaceComplexity"
 											class="dsa-complexity-info"
@@ -620,62 +667,23 @@
 		</div>
 
 		<!--
-			XP reward celebration. Purely presentational: it is only ever opened by
-			showXpRewardAnimation(), which submitCode() calls when the backend
-			returned status "Accepted" AND xp_awarded > 0.
-			Teleported to <body> so no ancestor (overflow / transform) can clip or
-			re-anchor the fixed overlay. Scoped styles still apply to teleported nodes.
+			Small XP toast. Opened only by showXpToast(), which is only called when
+			the backend reports xp.awarded === true on a final Accepted result.
+			Teleported to <body> so no ancestor (overflow / transform) can clip it.
 		-->
 		<Teleport to="body">
-			<Transition name="xp-reward">
+			<Transition name="dsa-xp-toast">
 				<div
-					v-if="showXpReward"
-					class="dsa-xp-overlay"
-					@click.self="dismissXpReward"
+					v-if="xpToast"
+					class="dsa-xp-toast"
+					role="status"
+					aria-live="polite"
+					@click="dismissXpToast"
 				>
-					<div
-						class="dsa-xp-card"
-						role="dialog"
-						aria-modal="true"
-						aria-labelledby="dsa-xp-amount dsa-xp-title"
-						aria-describedby="dsa-xp-desc"
-						@mouseenter="pauseXpRewardTimer"
-						@mouseleave="resumeXpRewardTimer"
-					>
-						<div class="dsa-xp-glow" aria-hidden="true"></div>
-
-						<div class="dsa-xp-badge" aria-hidden="true">
-							<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
-								<path d="M12 2.8l2.75 5.8 6.35.8-4.65 4.4 1.2 6.3L12 17.05 6.35 20.1l1.2-6.3L2.9 9.4l6.35-.8L12 2.8z" />
-							</svg>
-						</div>
-
-						<div class="dsa-xp-amount-wrap">
-							<span class="dsa-xp-particles" aria-hidden="true">
-								<span
-									v-for="particle in xpRewardParticles"
-									:key="particle.id"
-									class="dsa-xp-particle"
-									:class="{ 'is-alt': particle.alt }"
-									:style="particle.style"
-								></span>
-							</span>
-							<p id="dsa-xp-amount" class="dsa-xp-amount">+{{ xpRewardAmount }} XP</p>
-						</div>
-
-						<h2 id="dsa-xp-title" class="dsa-xp-title">{{ __("Problem Solved!") }}</h2>
-						<p id="dsa-xp-desc" class="dsa-xp-desc">
-							{{ __("You've earned XP for your first accepted solution.") }}
-						</p>
-
-						<button
-							ref="xpRewardButton"
-							type="button"
-							class="dsa-xp-continue"
-							@click="dismissXpReward"
-						>
-							{{ __("Continue") }}
-						</button>
+					<span class="dsa-xp-toast-icon" aria-hidden="true">★</span>
+					<div class="dsa-xp-toast-body">
+						<strong>+{{ xpToast.gained }} XP</strong>
+						<span>{{ __("Total XP") }}: {{ xpToast.total }}</span>
 					</div>
 				</div>
 			</Transition>
@@ -684,7 +692,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import MonacoEditor from "./MonacoEditor.vue";
 
 const elapsedTime = ref(0);
@@ -782,22 +790,19 @@ const contestProgress = ref(null);
 const contestProgressLoading = ref(false);
 const submissionMade = ref(false);
 
-// --- XP reward celebration (presentation only) -------------------------
-// The backend decides whether XP was awarded; these refs only drive the UI.
-const showXpReward = ref(false);
-const xpRewardAmount = ref(0);
-const xpRewardParticles = ref([]);
-const xpRewardButton = ref(null);
+// --- XP (display only) --------------------------------------------------
+// The backend decides everything about XP. These refs only hold what the
+// backend last told us:
+//   xpTotal   - the user's total XP (from get_xp_summary / the `xp` object)
+//   resultXp  - the `xp` object of the submission currently shown
+//   xpToast   - set only when the backend says this submission earned XP
+const xpTotal = ref(0);
+const xpLoaded = ref(false);
+const resultXp = ref(null);
+const xpToast = ref(null);
 
-const XP_REWARD_VISIBLE_MS = 3600; // auto-dismiss delay
-const XP_REWARD_RESUME_MS = 2000; // remaining time after hover ends
-
-let xpRewardTimer = null;
-let xpRewardPreviousFocus = null;
-// Submissions whose reward has already been shown in this component's
-// lifetime, so the same response can never trigger a second overlay.
-// This is only a duplicate-presentation guard — it does NOT decide first solve.
-const xpRewardedSubmissions = new Set();
+const XP_TOAST_VISIBLE_MS = 4500;
+let xpToastTimer = null;
 
 let generation = 0;
 let nextTestCaseKey = 2;
@@ -992,117 +997,63 @@ function formatSubmissionTime(submission) {
 }
 
 // ---------------------------------------------------------------------
-// XP reward celebration
+// XP (display only — the backend is the source of truth)
 // ---------------------------------------------------------------------
 
-function prefersReducedMotion() {
-	return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+function dismissXpToast() {
+	clearTimeout(xpToastTimer);
+	xpToastTimer = null;
+	xpToast.value = null;
 }
 
-// A small, one-off burst of particles radiating from the XP number. The
-// randomness only affects direction/size/delay; positions are animated in CSS.
-function buildXpRewardParticles() {
-	if (prefersReducedMotion()) return [];
-
-	const count = 18;
-
-	return Array.from({ length: count }, (_, index) => {
-		const angle = (Math.PI * 2 * index) / count + (Math.random() - 0.5) * 0.5;
-		const distance = 70 + Math.random() * 75;
-
-		return {
-			id: index,
-			alt: index % 3 === 0,
-			style: {
-				"--dx": `${Math.round(Math.cos(angle) * distance)}px`,
-				"--dy": `${Math.round(Math.sin(angle) * distance)}px`,
-				"--size": `${4 + Math.round(Math.random() * 3)}px`,
-				"--delay": `${Math.round(Math.random() * 140)}ms`,
-			},
-		};
-	});
+function showXpToast(gained, total) {
+	clearTimeout(xpToastTimer);
+	xpToast.value = { gained, total };
+	xpToastTimer = setTimeout(dismissXpToast, XP_TOAST_VISIBLE_MS);
 }
 
-function scheduleXpRewardDismiss(milliseconds) {
-	clearTimeout(xpRewardTimer);
-	xpRewardTimer = setTimeout(dismissXpReward, milliseconds);
-}
+// Loads the user's total XP. A failure only hides the XP chip; it never
+// blocks the practice page.
+async function loadXp() {
+	if (props.contestMode) return;
 
-// Hovering the card pauses the auto-dismiss so it never disappears under the
-// pointer; leaving it gives the user a short grace period.
-function pauseXpRewardTimer() {
-	clearTimeout(xpRewardTimer);
-	xpRewardTimer = null;
-}
-
-function resumeXpRewardTimer() {
-	if (showXpReward.value) {
-		scheduleXpRewardDismiss(XP_REWARD_RESUME_MS);
+	try {
+		const summary = await call("dsa.api.get_xp_summary");
+		if (disposed) return;
+		xpTotal.value = Number(summary?.total_xp) || 0;
+		xpLoaded.value = true;
+	} catch (error) {
+		console.error("Failed to load XP:", error);
 	}
 }
 
-function handleXpRewardKeydown(event) {
-	if (event.key === "Escape") {
-		dismissXpReward();
-	}
-}
+// Applies the `xp` object from a FINAL (non-pending) submission response.
+// The toast is shown only when the backend says THIS submission just earned
+// XP (xp.awarded). The backend reports that exactly once per award, so
+// repeated polls, refreshes and re-solves can never trigger it again.
+function applyXpResult(result) {
+	const xp = result?.xp;
 
-function showXpRewardAnimation(amount) {
-	const value = Number(amount);
+	resultXp.value = xp || null;
 
-	// Never stack overlays, never show for a non-positive amount.
-	if (!Number.isFinite(value) || value <= 0 || showXpReward.value) return;
+	if (!xp) return;
 
-	xpRewardPreviousFocus = document.activeElement;
-	xpRewardAmount.value = value;
-	xpRewardParticles.value = buildXpRewardParticles();
-	showXpReward.value = true;
-
-	window.addEventListener("keydown", handleXpRewardKeydown);
-	scheduleXpRewardDismiss(XP_REWARD_VISIBLE_MS);
-
-	// Move focus to "Continue" so keyboard users can dismiss it; it is
-	// restored to where it was when the reward closes.
-	nextTick(() => xpRewardButton.value?.focus({ preventScroll: true }));
-}
-
-function dismissXpReward() {
-	// Cancels the auto-dismiss timer too, so a manual dismissal is final.
-	clearTimeout(xpRewardTimer);
-	xpRewardTimer = null;
-	window.removeEventListener("keydown", handleXpRewardKeydown);
-
-	if (!showXpReward.value) return;
-
-	const active = document.activeElement;
-	const focusWasOnReward =
-		!active || active === document.body || active === xpRewardButton.value;
-
-	showXpReward.value = false;
-
-	if (
-		focusWasOnReward &&
-		xpRewardPreviousFocus &&
-		document.contains(xpRewardPreviousFocus)
-	) {
-		xpRewardPreviousFocus.focus?.({ preventScroll: true });
+	const total = Number(xp.total);
+	if (Number.isFinite(total)) {
+		xpTotal.value = total;
+		xpLoaded.value = true;
 	}
 
-	xpRewardPreviousFocus = null;
-}
+	if (xp.error) {
+		frappe.show_alert({ message: xp.error, indicator: "orange" });
+	}
 
-// Called with the submission response. The backend value (xp_awarded > 0 on an
-// Accepted result) is the ONLY thing that decides whether a reward is shown;
-// the Set below just prevents the same submission from being celebrated twice.
-function maybeShowXpReward(submissionId, result) {
-	if (!(result?.status === "Accepted" && result.xp_awarded > 0)) return;
-
-	const key = submissionId || `xp-${Date.now()}`;
-
-	if (xpRewardedSubmissions.has(key) || showXpReward.value) return;
-
-	xpRewardedSubmissions.add(key);
-	showXpRewardAnimation(result.xp_awarded);
+	if (result.status === "Accepted" && xp.awarded && Number(xp.gained) > 0) {
+		if (problem.value) problem.value.solved = true;
+		showXpToast(Number(xp.gained), Number.isFinite(total) ? total : xpTotal.value);
+	} else if (result.status === "Accepted" && xp.already_awarded && problem.value) {
+		problem.value.solved = true;
+	}
 }
 
 function startTimer(startedAt) {
@@ -1182,6 +1133,7 @@ function clearResults() {
     complexityResult.value = "";
     spaceComplexityResult.value = "";
     activeResultCaseIndex.value = 0;
+	resultXp.value = null;
 }
 
 async function selectProblemTab(tab) {
@@ -1420,6 +1372,9 @@ onMounted(async () => {
 		}
 
 		await loadProblem(null, props.problemSlug);
+
+		// Not awaited: the XP chip must never delay or break the page.
+		loadXp();
 	} catch (error) {
 		showError(error);
 	} finally {
@@ -1558,16 +1513,18 @@ async function submitCode() {
             generation === currentGeneration;
             attempt += 1
         ) {
-            const result = await call(
-                props.contestMode
-                    ? "dsa.api.get_contest_submission_result"
-                    : "dsa.api.get_submission_result",
-                {
-                    submission: props.contestMode
-                        ? queued.contest_submission
-                        : queued.submission,
-                }
-            );
+            // Practice submissions are polled with POST: the backend may write
+            // (verdict + XP award), and Frappe only commits writes on POST.
+            // Contest polling is unchanged.
+            const result = props.contestMode
+                ? await call("dsa.api.get_contest_submission_result", {
+                      submission: queued.contest_submission,
+                  })
+                : await call(
+                      "dsa.api.get_submission_result",
+                      { submission: queued.submission },
+                      "POST"
+                  );
 
             resultComplexity.value =
                 result.time_complexity ||
@@ -1626,33 +1583,29 @@ async function submitCode() {
             );
 
             if (!result.pending) {
-            // Final (non-pending) response only: celebrate a first accepted
-            // solve. The backend's xp_awarded is the sole source of truth —
-            // it is 0 for repeat solves, failures and refreshes.
-            maybeShowXpReward(
-                props.contestMode
-                    ? queued.contest_submission
-                    : queued.submission,
-                result
-            );
-
-            await loadSubmissions();
-
-            if (props.contestMode) {
-                const accepted =
-                    !complexityRejected &&
-                    (result.status === "Accepted" || result.status_id === 3);
-
-                if (accepted) {
-                    submissionMade.value = true;
-                    clearInterval(timerInterval);
+                // Final response only. XP is displayed exactly as the backend
+                // reported it; practice mode only (contest scoring is separate).
+                if (!props.contestMode) {
+                    applyXpResult(result);
                 }
 
-                await loadContestProgress();
-            }
+                await loadSubmissions();
 
-            return;
-        }
+                if (props.contestMode) {
+                    const accepted =
+                        !complexityRejected &&
+                        (result.status === "Accepted" || result.status_id === 3);
+
+                    if (accepted) {
+                        submissionMade.value = true;
+                        clearInterval(timerInterval);
+                    }
+
+                    await loadContestProgress();
+                }
+
+                return;
+            }
 
             await wait(1000);
         }
@@ -1743,8 +1696,7 @@ onBeforeUnmount(() => {
 	generation += 1;
 	stopResize();
 	clearInterval(timerInterval);
-	clearTimeout(xpRewardTimer);
-	window.removeEventListener("keydown", handleXpRewardKeydown);
+	clearTimeout(xpToastTimer);
 });
 function formatMemory(memory) {
 	const kb = Number(memory);
@@ -1851,10 +1803,36 @@ function formatMemory(memory) {
 	white-space: nowrap;
 	font-weight: 550;
 }
-.dsa-nav-mark {
+.dsa-nav-right {
+	display: flex;
+	align-items: center;
+	gap: 14px;
 	margin-left: auto;
+}
+.dsa-nav-mark {
 	color: var(--text-muted);
 	font-size: 18px;
+}
+.dsa-xp-chip {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 5px 11px;
+	border: 1px solid var(--border-color);
+	border-radius: 999px;
+	background: var(--card-bg);
+	font-size: 12px;
+	line-height: 1.2;
+}
+.dsa-xp-chip-label {
+	color: var(--text-muted);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+}
+.dsa-xp-chip strong {
+	color: var(--text-on-orange);
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
 }
 .dsa-problem-topics {
 	min-width: 0;
@@ -2023,6 +2001,17 @@ function formatMemory(memory) {
 
 .dsa-chip.amber {
 	color: var(--text-on-orange);
+}
+
+.dsa-chip-xp {
+	color: var(--text-on-orange);
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.dsa-chip-solved {
+	color: var(--text-on-green);
+	font-weight: 600;
 }
 
 .dsa-statement section {
@@ -2718,6 +2707,27 @@ function formatMemory(memory) {
 	color: var(--text-muted);
 }
 
+/* XP outcome line shown under the verdict. */
+.dsa-xp-line {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 12px;
+	margin: -8px 0 16px;
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.dsa-xp-line strong {
+	color: var(--text-on-orange);
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.dsa-xp-line.is-error {
+	color: var(--text-on-orange);
+}
+
 .dsa-complexity-info {
 	display: flex;
 	flex-wrap: wrap;
@@ -2914,276 +2924,80 @@ function formatMemory(memory) {
 }
 
 /* ============================================================
-   XP REWARD CELEBRATION
-   Scoped to this component. Colors come from the existing theme
-   variables (--card-bg, --border-color, --text-on-orange, …) so it
-   follows the light/dark data-theme automatically; hex values are
-   only fallbacks.
+   XP TOAST
+   Small, non-blocking card in the bottom-right corner. Colors come from
+   the existing theme variables so it follows light/dark automatically.
    ============================================================ */
 
-.dsa-xp-overlay {
-	--dsa-xp-gold: var(--text-on-orange, #f5b84b);
-	--dsa-xp-green: var(--text-on-green, #5fd68a);
-
+.dsa-xp-toast {
 	position: fixed;
-	inset: 0;
+	right: 20px;
+	bottom: 20px;
 	z-index: 2000;
-	display: grid;
-	place-items: center;
-	padding: 20px;
-	background: rgba(8, 8, 10, 0.5);
-	backdrop-filter: blur(2px);
-	-webkit-backdrop-filter: blur(2px);
-}
-
-.dsa-xp-card {
-	position: relative;
-	width: min(360px, 100%);
-	padding: 28px 24px 22px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 190px;
+	padding: 12px 16px;
 	border: 1px solid var(--border-color, #3a3a3a);
-	border-radius: 14px;
+	border-left: 3px solid var(--text-on-orange, #f5b84b);
+	border-radius: 10px;
 	background: var(--card-bg, #1e1e1e);
 	color: var(--text-color, #e6e6e6);
-	text-align: center;
-	box-shadow:
-		0 24px 60px rgba(0, 0, 0, 0.35),
-		0 0 44px rgba(245, 184, 75, 0.1);
-	/* "backwards" (not "both") so the leave transition can move the card. */
-	animation: dsa-xp-card-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.12) backwards;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+	cursor: pointer;
 }
 
-/* Thin accent line along the top edge of the card. */
-.dsa-xp-card::before {
-	position: absolute;
-	top: -1px;
-	right: 28px;
-	left: 28px;
-	height: 2px;
-	border-radius: 2px;
-	background: linear-gradient(90deg, transparent, var(--dsa-xp-gold), transparent);
-	content: "";
-	opacity: 0.85;
+.dsa-xp-toast-icon {
+	color: var(--text-on-orange, #f5b84b);
+	font-size: 20px;
+	line-height: 1;
 }
 
-.dsa-xp-glow {
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	background: radial-gradient(circle at 50% 42%, rgba(245, 184, 75, 0.15), transparent 62%);
-	pointer-events: none;
+.dsa-xp-toast-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
 }
 
-.dsa-xp-badge {
-	position: relative;
-	display: grid;
-	width: 44px;
-	height: 44px;
-	margin: 0 auto 14px;
-	place-items: center;
-	border: 1px solid var(--border-color, #3a3a3a);
-	border-radius: 50%;
-	background: var(--control-bg, #252525);
-	color: var(--dsa-xp-gold);
-	animation: dsa-xp-fade-up 0.4s 0.08s ease-out backwards;
-}
-
-.dsa-xp-badge svg {
-	width: 22px;
-	height: 22px;
-}
-
-.dsa-xp-amount-wrap {
-	position: relative;
-	display: inline-block;
-}
-
-.dsa-xp-amount {
-	position: relative;
-	margin: 0;
-	color: var(--dsa-xp-gold);
-	font-size: clamp(44px, 13vw, 60px);
+.dsa-xp-toast-body strong {
+	color: var(--text-on-orange, #f5b84b);
+	font-size: 17px;
 	font-variant-numeric: tabular-nums;
 	font-weight: 700;
-	letter-spacing: -0.02em;
-	line-height: 1;
-	animation: dsa-xp-pop 0.6s 0.12s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+	line-height: 1.2;
 }
 
-.dsa-xp-particles {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	width: 0;
-	height: 0;
-	pointer-events: none;
-}
-
-.dsa-xp-particle {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: var(--size);
-	height: var(--size);
-	border-radius: 50%;
-	background: var(--dsa-xp-gold);
-	opacity: 0;
-	animation: dsa-xp-burst 0.9s cubic-bezier(0.12, 0.75, 0.3, 1) both;
-	animation-delay: calc(0.28s + var(--delay));
-	will-change: transform, opacity;
-}
-
-.dsa-xp-particle.is-alt {
-	width: calc(var(--size) * 1.4);
-	height: calc(var(--size) * 0.7);
-	border-radius: 2px;
-	background: var(--dsa-xp-green);
-}
-
-.dsa-xp-title {
-	margin: 14px 0 0;
-	color: var(--text-color, #e6e6e6);
-	font-size: 17px;
-	font-weight: 650;
-	animation: dsa-xp-fade-up 0.4s 0.3s ease-out backwards;
-}
-
-.dsa-xp-desc {
-	max-width: 250px;
-	margin: 6px auto 0;
+.dsa-xp-toast-body span {
 	color: var(--text-muted, #999);
-	font-size: 12.5px;
-	line-height: 1.5;
-	animation: dsa-xp-fade-up 0.4s 0.38s ease-out backwards;
-}
-
-.dsa-xp-continue {
-	margin-top: 20px;
-	padding: 7px 20px;
-	border: 1px solid var(--border-color, #3a3a3a);
-	border-radius: 6px;
-	background: var(--control-bg, #252525);
-	color: var(--text-color, #e6e6e6);
 	font-size: 12px;
-	font-weight: 600;
-	cursor: pointer;
+}
+
+.dsa-xp-toast-enter-active,
+.dsa-xp-toast-leave-active {
 	transition:
-		background-color 0.15s ease,
-		border-color 0.15s ease;
-	animation: dsa-xp-fade-up 0.4s 0.46s ease-out backwards;
+		opacity 0.25s ease,
+		transform 0.25s ease;
 }
 
-.dsa-xp-continue:hover {
-	background: var(--fg-hover-color, #303030);
-}
-
-.dsa-xp-continue:focus-visible {
-	outline: 2px solid var(--primary, #4b8bf5);
-	outline-offset: 2px;
-}
-
-/* Enter / leave of the whole overlay (Vue <Transition name="xp-reward">). */
-.xp-reward-enter-active {
-	transition: opacity 0.25s ease;
-}
-
-.xp-reward-leave-active {
-	transition: opacity 0.3s ease;
-}
-
-.xp-reward-leave-active .dsa-xp-card {
-	transition:
-		transform 0.3s ease,
-		opacity 0.3s ease;
-}
-
-.xp-reward-enter-from,
-.xp-reward-leave-to {
+.dsa-xp-toast-enter-from,
+.dsa-xp-toast-leave-to {
 	opacity: 0;
+	transform: translateY(12px);
 }
 
-.xp-reward-leave-to .dsa-xp-card {
-	opacity: 0;
-	transform: translateY(14px) scale(0.97);
-}
-
-@keyframes dsa-xp-card-in {
-	from {
-		opacity: 0;
-		transform: translateY(10px) scale(0.92);
-	}
-	to {
-		opacity: 1;
-		transform: none;
-	}
-}
-
-@keyframes dsa-xp-pop {
-	0% {
-		opacity: 0;
-		transform: scale(0.5);
-	}
-	55% {
-		opacity: 1;
-		transform: scale(1.16);
-	}
-	78% {
-		transform: scale(0.96);
-	}
-	100% {
-		opacity: 1;
-		transform: scale(1);
-	}
-}
-
-@keyframes dsa-xp-burst {
-	0% {
-		opacity: 0;
-		transform: translate(-50%, -50%) scale(0.4);
-	}
-	15% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-		transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1);
-	}
-}
-
-@keyframes dsa-xp-fade-up {
-	from {
-		opacity: 0;
-		transform: translateY(6px);
-	}
-	to {
-		opacity: 1;
-		transform: none;
+@media (prefers-reduced-motion: reduce) {
+	.dsa-xp-toast-enter-active,
+	.dsa-xp-toast-leave-active {
+		transition: none;
 	}
 }
 
 @media (max-width: 480px) {
-	.dsa-xp-card {
-		padding: 24px 18px 18px;
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.dsa-xp-card,
-	.dsa-xp-badge,
-	.dsa-xp-amount,
-	.dsa-xp-title,
-	.dsa-xp-desc,
-	.dsa-xp-continue {
-		animation: none;
-	}
-
-	.dsa-xp-particles {
-		display: none;
-	}
-
-	.xp-reward-enter-active,
-	.xp-reward-leave-active,
-	.xp-reward-leave-active .dsa-xp-card {
-		transition: none;
+	.dsa-xp-toast {
+		right: 12px;
+		bottom: 12px;
+		left: 12px;
 	}
 }
 </style>

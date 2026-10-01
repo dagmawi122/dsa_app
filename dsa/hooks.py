@@ -284,6 +284,10 @@ website_route_rules = [
         "from_route": "/contest-solve/<contest_name>/<problem_name>",
         "to_route": "contest-solve",
     },
+    {
+        "from_route": "/leaderboard",
+        "to_route": "leaderboard",
+    },
 ]
 
 fixtures = [

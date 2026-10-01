@@ -41,12 +41,18 @@
 		return (
 			path === "/contest-page" ||
 			path.startsWith("/contest-page/") ||
+
 			path === "/contest-solve" ||
 			path.startsWith("/contest-solve/") ||
+
 			path === "/dsa-practice" ||
 			path.startsWith("/dsa-practice/") ||
+
 			path === "/list-problems" ||
-			path.startsWith("/list-problems/")
+			path.startsWith("/list-problems/") ||
+
+			path === "/leaderboard" ||
+			path.startsWith("/leaderboard/")
 		);
 	}
 

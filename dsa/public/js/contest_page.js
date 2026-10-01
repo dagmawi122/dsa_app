@@ -73,7 +73,7 @@ class ContestPage {
             </div>
         `);
         $(".back-to-home").on("click", () => {
-            window.location.href = "/";
+            window.location.href = "/lms";
         });
 	}
 

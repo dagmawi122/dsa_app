@@ -1,6 +1,6 @@
 <template>
 	<section class="problem-catalog" aria-labelledby="catalog-title">
-		<a href="/" class="back-to-home" aria-label="Back to Home">
+		<a href="/lms" class="back-to-home" aria-label="Back to Home">
 			<svg
 				aria-hidden="true"
 				viewBox="0 0 24 24"
