@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import code
 import re
 from typing import Any
 
@@ -59,6 +58,100 @@ def _require_login() -> str:
 	if user == "Guest":
 		frappe.throw(_("Please log in to practice DSA problems."), frappe.PermissionError)
 	return user
+
+def add_xp(user: str, amount: int):
+    """Add XP to a user's existing XP record."""
+    amount = cint(amount)
+
+    if amount <= 0:
+        return 0
+
+    xp_name = frappe.db.get_value(
+        "XP",
+        {"user": user},
+        "name",
+    )
+
+    if not xp_name:
+        frappe.throw(
+            _("XP record not found for user {0}.").format(user)
+        )
+
+    current_xp = cint(
+        frappe.db.get_value(
+            "XP",
+            xp_name,
+            "value",
+        )
+        or 0
+    )
+
+    new_xp = current_xp + amount
+
+    frappe.db.set_value(
+        "XP",
+        xp_name,
+        "value",
+        new_xp,
+    )
+
+    return amount
+
+def award_problem_xp(
+    user: str,
+    problem: str,
+    submission_name: str,
+):
+    """Award XP for a user's first accepted solution to a problem."""
+
+    xp_reward = cint(
+        frappe.db.get_value(
+            "DSAProblem",
+            problem,
+            "xp_reward",
+        )
+        or 0
+    )
+
+    if xp_reward <= 0:
+        return 0
+
+    already_solved = frappe.db.exists(
+        "DSA Submission",
+        {
+            "member": user,
+            "problem": problem,
+            "status": "Accepted",
+            "name": ["!=", submission_name],
+        },
+    )
+
+    if already_solved:
+        return 0
+
+    return add_xp(user, xp_reward)
+
+
+# ---------------------------------------------------------------------
+# XP-awarded reporting
+#
+# Both the background worker and the browser's polling call
+# _refresh_submission(). Whichever call flips the submission to Accepted is
+# the only one that awards XP, but it is often the worker, whose return value
+# is discarded. The amount is therefore remembered here so that any later
+# refresh (the browser poll) can still report it to the UI.
+# ---------------------------------------------------------------------
+
+XP_AWARD_CACHE_TTL = 60 * 60 * 24  # keep the awarded amount for 24 hours
+
+
+def _xp_cache():
+    # frappe.cache is a function in Frappe v14 and an object in v15+.
+    return frappe.cache() if callable(frappe.cache) else frappe.cache
+
+
+def _xp_cache_key(submission_name: str) -> str:
+    return f"dsa_xp_awarded:{submission_name}"
 
 
 def _judge0_url() -> str:
@@ -820,6 +913,7 @@ def _refresh_contest_submission(
 		"space_complexity": result["space_complexity"],
 		"complexity_result": result["complexity_result"],
 		"space_complexity_result": result["space_complexity_result"],
+		"xp_awarded": result["xp_awarded"],
 	}
 
 @frappe.whitelist()
@@ -1462,7 +1556,70 @@ def submit_code(
 def _normalized_output(value: str | None) -> str:
 	return (value or "").replace("\r\n", "\n").rstrip()
 
+def _final_submission_result(doc: "frappe.model.document.Document") -> dict[str, Any]:
+	"""Build the API response for a submission that has already been graded.
+
+	Once a submission is Accepted/Failed every test case has a final verdict
+	stored on the document, so there is nothing left to ask Judge0. Skipping
+	the Judge0 round-trips means a poll that arrives after the background
+	worker finished can no longer fail because of a slow, rate-limited or
+	unreachable Judge0 (which surfaced in the browser as a generic error even
+	though the submission was Accepted).
+	"""
+	public_results = [
+		{
+			"index": row.test_case_index,
+			"status": row.status,
+			"input": row.input,
+			"expected_output": row.expected_output,
+			"actual_output": row.actual_output,
+			"error": row.error_output or None,
+		}
+		for row in doc.results
+	]
+
+	complexity_rejected = (
+		doc.complexity_result == "Too Complex"
+		or doc.space_complexity_result == "Too Complex"
+	)
+
+	xp_awarded = 0
+	if doc.status == "Accepted":
+		xp_awarded = cint(_xp_cache().get_value(_xp_cache_key(doc.name)) or 0)
+
+	return {
+		"pending": False,
+		"status": doc.status,
+		"display_status": "Rejected" if complexity_rejected else doc.status,
+		"passed_count": doc.passed_count,
+		"total_count": doc.total_count,
+		"runtime": doc.runtime,
+		"memory": doc.memory,
+		"results": public_results,
+		"time_complexity": doc.time_complexity,
+		"space_complexity": doc.space_complexity,
+		"complexity_result": doc.complexity_result,
+		"space_complexity_result": doc.space_complexity_result,
+		"xp_awarded": xp_awarded,
+	}
+
+
 def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]:
+	# The background worker (dsa.tasks.process_dsa_submission) and the browser's
+	# get_submission_result polling can refresh the same submission at the same
+	# time. Re-load the row with a lock so the two refreshes run one after the
+	# other. Without this, the second doc.save() fails with a TimestampMismatchError
+	# (surfacing as a generic "Something went wrong"), even though the other
+	# refresh succeeds and the submission ends up Accepted.
+	doc = frappe.get_doc("DSA Submission", doc.name)
+	previous_status = doc.status
+
+	# Already graded (by the worker or an earlier poll): report it as-is.
+	# Accepted/Failed are only ever assigned below once no test case is
+	# pending, so this is safe, and it must not call Judge0 again.
+	if previous_status in {"Accepted", "Failed"}:
+		return _final_submission_result(doc)
+
 	pending = False
 	passed = 0
 	total_runtime = 0.0
@@ -1569,6 +1726,8 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
 
 	doc.save(ignore_permissions=True)
 
+	xp_awarded = 0
+
 	return {
 		"pending": pending,
 		"status": doc.status,
@@ -1582,6 +1741,7 @@ def _refresh_submission(doc: "frappe.model.document.Document") -> dict[str, Any]
 		"space_complexity": doc.space_complexity,
 		"complexity_result": doc.complexity_result,
 		"space_complexity_result": doc.space_complexity_result,
+		"xp_awarded": xp_awarded,
 	}
 
 @frappe.whitelist()

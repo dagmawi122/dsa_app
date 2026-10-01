@@ -618,11 +618,73 @@
 				</div>
 			</div>
 		</div>
+
+		<!--
+			XP reward celebration. Purely presentational: it is only ever opened by
+			showXpRewardAnimation(), which submitCode() calls when the backend
+			returned status "Accepted" AND xp_awarded > 0.
+			Teleported to <body> so no ancestor (overflow / transform) can clip or
+			re-anchor the fixed overlay. Scoped styles still apply to teleported nodes.
+		-->
+		<Teleport to="body">
+			<Transition name="xp-reward">
+				<div
+					v-if="showXpReward"
+					class="dsa-xp-overlay"
+					@click.self="dismissXpReward"
+				>
+					<div
+						class="dsa-xp-card"
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby="dsa-xp-amount dsa-xp-title"
+						aria-describedby="dsa-xp-desc"
+						@mouseenter="pauseXpRewardTimer"
+						@mouseleave="resumeXpRewardTimer"
+					>
+						<div class="dsa-xp-glow" aria-hidden="true"></div>
+
+						<div class="dsa-xp-badge" aria-hidden="true">
+							<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+								<path d="M12 2.8l2.75 5.8 6.35.8-4.65 4.4 1.2 6.3L12 17.05 6.35 20.1l1.2-6.3L2.9 9.4l6.35-.8L12 2.8z" />
+							</svg>
+						</div>
+
+						<div class="dsa-xp-amount-wrap">
+							<span class="dsa-xp-particles" aria-hidden="true">
+								<span
+									v-for="particle in xpRewardParticles"
+									:key="particle.id"
+									class="dsa-xp-particle"
+									:class="{ 'is-alt': particle.alt }"
+									:style="particle.style"
+								></span>
+							</span>
+							<p id="dsa-xp-amount" class="dsa-xp-amount">+{{ xpRewardAmount }} XP</p>
+						</div>
+
+						<h2 id="dsa-xp-title" class="dsa-xp-title">{{ __("Problem Solved!") }}</h2>
+						<p id="dsa-xp-desc" class="dsa-xp-desc">
+							{{ __("You've earned XP for your first accepted solution.") }}
+						</p>
+
+						<button
+							ref="xpRewardButton"
+							type="button"
+							class="dsa-xp-continue"
+							@click="dismissXpReward"
+						>
+							{{ __("Continue") }}
+						</button>
+					</div>
+				</div>
+			</Transition>
+		</Teleport>
 	</div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import MonacoEditor from "./MonacoEditor.vue";
 
 const elapsedTime = ref(0);
@@ -719,6 +781,23 @@ const resizing = ref(false);
 const contestProgress = ref(null);
 const contestProgressLoading = ref(false);
 const submissionMade = ref(false);
+
+// --- XP reward celebration (presentation only) -------------------------
+// The backend decides whether XP was awarded; these refs only drive the UI.
+const showXpReward = ref(false);
+const xpRewardAmount = ref(0);
+const xpRewardParticles = ref([]);
+const xpRewardButton = ref(null);
+
+const XP_REWARD_VISIBLE_MS = 3600; // auto-dismiss delay
+const XP_REWARD_RESUME_MS = 2000; // remaining time after hover ends
+
+let xpRewardTimer = null;
+let xpRewardPreviousFocus = null;
+// Submissions whose reward has already been shown in this component's
+// lifetime, so the same response can never trigger a second overlay.
+// This is only a duplicate-presentation guard — it does NOT decide first solve.
+const xpRewardedSubmissions = new Set();
 
 let generation = 0;
 let nextTestCaseKey = 2;
@@ -910,6 +989,120 @@ function submissionStatus(submission) {
 
 function formatSubmissionTime(submission) {
 	return submission.submission_time || submission.creation || "—";
+}
+
+// ---------------------------------------------------------------------
+// XP reward celebration
+// ---------------------------------------------------------------------
+
+function prefersReducedMotion() {
+	return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+}
+
+// A small, one-off burst of particles radiating from the XP number. The
+// randomness only affects direction/size/delay; positions are animated in CSS.
+function buildXpRewardParticles() {
+	if (prefersReducedMotion()) return [];
+
+	const count = 18;
+
+	return Array.from({ length: count }, (_, index) => {
+		const angle = (Math.PI * 2 * index) / count + (Math.random() - 0.5) * 0.5;
+		const distance = 70 + Math.random() * 75;
+
+		return {
+			id: index,
+			alt: index % 3 === 0,
+			style: {
+				"--dx": `${Math.round(Math.cos(angle) * distance)}px`,
+				"--dy": `${Math.round(Math.sin(angle) * distance)}px`,
+				"--size": `${4 + Math.round(Math.random() * 3)}px`,
+				"--delay": `${Math.round(Math.random() * 140)}ms`,
+			},
+		};
+	});
+}
+
+function scheduleXpRewardDismiss(milliseconds) {
+	clearTimeout(xpRewardTimer);
+	xpRewardTimer = setTimeout(dismissXpReward, milliseconds);
+}
+
+// Hovering the card pauses the auto-dismiss so it never disappears under the
+// pointer; leaving it gives the user a short grace period.
+function pauseXpRewardTimer() {
+	clearTimeout(xpRewardTimer);
+	xpRewardTimer = null;
+}
+
+function resumeXpRewardTimer() {
+	if (showXpReward.value) {
+		scheduleXpRewardDismiss(XP_REWARD_RESUME_MS);
+	}
+}
+
+function handleXpRewardKeydown(event) {
+	if (event.key === "Escape") {
+		dismissXpReward();
+	}
+}
+
+function showXpRewardAnimation(amount) {
+	const value = Number(amount);
+
+	// Never stack overlays, never show for a non-positive amount.
+	if (!Number.isFinite(value) || value <= 0 || showXpReward.value) return;
+
+	xpRewardPreviousFocus = document.activeElement;
+	xpRewardAmount.value = value;
+	xpRewardParticles.value = buildXpRewardParticles();
+	showXpReward.value = true;
+
+	window.addEventListener("keydown", handleXpRewardKeydown);
+	scheduleXpRewardDismiss(XP_REWARD_VISIBLE_MS);
+
+	// Move focus to "Continue" so keyboard users can dismiss it; it is
+	// restored to where it was when the reward closes.
+	nextTick(() => xpRewardButton.value?.focus({ preventScroll: true }));
+}
+
+function dismissXpReward() {
+	// Cancels the auto-dismiss timer too, so a manual dismissal is final.
+	clearTimeout(xpRewardTimer);
+	xpRewardTimer = null;
+	window.removeEventListener("keydown", handleXpRewardKeydown);
+
+	if (!showXpReward.value) return;
+
+	const active = document.activeElement;
+	const focusWasOnReward =
+		!active || active === document.body || active === xpRewardButton.value;
+
+	showXpReward.value = false;
+
+	if (
+		focusWasOnReward &&
+		xpRewardPreviousFocus &&
+		document.contains(xpRewardPreviousFocus)
+	) {
+		xpRewardPreviousFocus.focus?.({ preventScroll: true });
+	}
+
+	xpRewardPreviousFocus = null;
+}
+
+// Called with the submission response. The backend value (xp_awarded > 0 on an
+// Accepted result) is the ONLY thing that decides whether a reward is shown;
+// the Set below just prevents the same submission from being celebrated twice.
+function maybeShowXpReward(submissionId, result) {
+	if (!(result?.status === "Accepted" && result.xp_awarded > 0)) return;
+
+	const key = submissionId || `xp-${Date.now()}`;
+
+	if (xpRewardedSubmissions.has(key) || showXpReward.value) return;
+
+	xpRewardedSubmissions.add(key);
+	showXpRewardAnimation(result.xp_awarded);
 }
 
 function startTimer(startedAt) {
@@ -1433,6 +1626,16 @@ async function submitCode() {
             );
 
             if (!result.pending) {
+            // Final (non-pending) response only: celebrate a first accepted
+            // solve. The backend's xp_awarded is the sole source of truth —
+            // it is 0 for repeat solves, failures and refreshes.
+            maybeShowXpReward(
+                props.contestMode
+                    ? queued.contest_submission
+                    : queued.submission,
+                result
+            );
+
             await loadSubmissions();
 
             if (props.contestMode) {
@@ -1540,6 +1743,8 @@ onBeforeUnmount(() => {
 	generation += 1;
 	stopResize();
 	clearInterval(timerInterval);
+	clearTimeout(xpRewardTimer);
+	window.removeEventListener("keydown", handleXpRewardKeydown);
 });
 function formatMemory(memory) {
 	const kb = Number(memory);
@@ -2705,6 +2910,280 @@ function formatMemory(memory) {
 	.dsa-complexity-info {
 		flex-direction: column;
 		gap: 8px;
+	}
+}
+
+/* ============================================================
+   XP REWARD CELEBRATION
+   Scoped to this component. Colors come from the existing theme
+   variables (--card-bg, --border-color, --text-on-orange, …) so it
+   follows the light/dark data-theme automatically; hex values are
+   only fallbacks.
+   ============================================================ */
+
+.dsa-xp-overlay {
+	--dsa-xp-gold: var(--text-on-orange, #f5b84b);
+	--dsa-xp-green: var(--text-on-green, #5fd68a);
+
+	position: fixed;
+	inset: 0;
+	z-index: 2000;
+	display: grid;
+	place-items: center;
+	padding: 20px;
+	background: rgba(8, 8, 10, 0.5);
+	backdrop-filter: blur(2px);
+	-webkit-backdrop-filter: blur(2px);
+}
+
+.dsa-xp-card {
+	position: relative;
+	width: min(360px, 100%);
+	padding: 28px 24px 22px;
+	border: 1px solid var(--border-color, #3a3a3a);
+	border-radius: 14px;
+	background: var(--card-bg, #1e1e1e);
+	color: var(--text-color, #e6e6e6);
+	text-align: center;
+	box-shadow:
+		0 24px 60px rgba(0, 0, 0, 0.35),
+		0 0 44px rgba(245, 184, 75, 0.1);
+	/* "backwards" (not "both") so the leave transition can move the card. */
+	animation: dsa-xp-card-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.12) backwards;
+}
+
+/* Thin accent line along the top edge of the card. */
+.dsa-xp-card::before {
+	position: absolute;
+	top: -1px;
+	right: 28px;
+	left: 28px;
+	height: 2px;
+	border-radius: 2px;
+	background: linear-gradient(90deg, transparent, var(--dsa-xp-gold), transparent);
+	content: "";
+	opacity: 0.85;
+}
+
+.dsa-xp-glow {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: radial-gradient(circle at 50% 42%, rgba(245, 184, 75, 0.15), transparent 62%);
+	pointer-events: none;
+}
+
+.dsa-xp-badge {
+	position: relative;
+	display: grid;
+	width: 44px;
+	height: 44px;
+	margin: 0 auto 14px;
+	place-items: center;
+	border: 1px solid var(--border-color, #3a3a3a);
+	border-radius: 50%;
+	background: var(--control-bg, #252525);
+	color: var(--dsa-xp-gold);
+	animation: dsa-xp-fade-up 0.4s 0.08s ease-out backwards;
+}
+
+.dsa-xp-badge svg {
+	width: 22px;
+	height: 22px;
+}
+
+.dsa-xp-amount-wrap {
+	position: relative;
+	display: inline-block;
+}
+
+.dsa-xp-amount {
+	position: relative;
+	margin: 0;
+	color: var(--dsa-xp-gold);
+	font-size: clamp(44px, 13vw, 60px);
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1;
+	animation: dsa-xp-pop 0.6s 0.12s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+}
+
+.dsa-xp-particles {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 0;
+	height: 0;
+	pointer-events: none;
+}
+
+.dsa-xp-particle {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: var(--size);
+	height: var(--size);
+	border-radius: 50%;
+	background: var(--dsa-xp-gold);
+	opacity: 0;
+	animation: dsa-xp-burst 0.9s cubic-bezier(0.12, 0.75, 0.3, 1) both;
+	animation-delay: calc(0.28s + var(--delay));
+	will-change: transform, opacity;
+}
+
+.dsa-xp-particle.is-alt {
+	width: calc(var(--size) * 1.4);
+	height: calc(var(--size) * 0.7);
+	border-radius: 2px;
+	background: var(--dsa-xp-green);
+}
+
+.dsa-xp-title {
+	margin: 14px 0 0;
+	color: var(--text-color, #e6e6e6);
+	font-size: 17px;
+	font-weight: 650;
+	animation: dsa-xp-fade-up 0.4s 0.3s ease-out backwards;
+}
+
+.dsa-xp-desc {
+	max-width: 250px;
+	margin: 6px auto 0;
+	color: var(--text-muted, #999);
+	font-size: 12.5px;
+	line-height: 1.5;
+	animation: dsa-xp-fade-up 0.4s 0.38s ease-out backwards;
+}
+
+.dsa-xp-continue {
+	margin-top: 20px;
+	padding: 7px 20px;
+	border: 1px solid var(--border-color, #3a3a3a);
+	border-radius: 6px;
+	background: var(--control-bg, #252525);
+	color: var(--text-color, #e6e6e6);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background-color 0.15s ease,
+		border-color 0.15s ease;
+	animation: dsa-xp-fade-up 0.4s 0.46s ease-out backwards;
+}
+
+.dsa-xp-continue:hover {
+	background: var(--fg-hover-color, #303030);
+}
+
+.dsa-xp-continue:focus-visible {
+	outline: 2px solid var(--primary, #4b8bf5);
+	outline-offset: 2px;
+}
+
+/* Enter / leave of the whole overlay (Vue <Transition name="xp-reward">). */
+.xp-reward-enter-active {
+	transition: opacity 0.25s ease;
+}
+
+.xp-reward-leave-active {
+	transition: opacity 0.3s ease;
+}
+
+.xp-reward-leave-active .dsa-xp-card {
+	transition:
+		transform 0.3s ease,
+		opacity 0.3s ease;
+}
+
+.xp-reward-enter-from,
+.xp-reward-leave-to {
+	opacity: 0;
+}
+
+.xp-reward-leave-to .dsa-xp-card {
+	opacity: 0;
+	transform: translateY(14px) scale(0.97);
+}
+
+@keyframes dsa-xp-card-in {
+	from {
+		opacity: 0;
+		transform: translateY(10px) scale(0.92);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes dsa-xp-pop {
+	0% {
+		opacity: 0;
+		transform: scale(0.5);
+	}
+	55% {
+		opacity: 1;
+		transform: scale(1.16);
+	}
+	78% {
+		transform: scale(0.96);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes dsa-xp-burst {
+	0% {
+		opacity: 0;
+		transform: translate(-50%, -50%) scale(0.4);
+	}
+	15% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+		transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1);
+	}
+}
+
+@keyframes dsa-xp-fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (max-width: 480px) {
+	.dsa-xp-card {
+		padding: 24px 18px 18px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dsa-xp-card,
+	.dsa-xp-badge,
+	.dsa-xp-amount,
+	.dsa-xp-title,
+	.dsa-xp-desc,
+	.dsa-xp-continue {
+		animation: none;
+	}
+
+	.dsa-xp-particles {
+		display: none;
+	}
+
+	.xp-reward-enter-active,
+	.xp-reward-leave-active,
+	.xp-reward-leave-active .dsa-xp-card {
+		transition: none;
 	}
 }
 </style>
