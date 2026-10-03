@@ -27,6 +27,12 @@
   "java_code_section",
   "custom_java_starter_code",
   "custom_java_wrapper_code",
+  "solution_section",
+  "solution_cpp",
+  "solution_python",
+  "solution_javascript",
+  "solution_java",
+  "solution_xp_deduction",
   "test_cases",
   "time_complexity",
   "space_complexity",
@@ -157,6 +163,41 @@
    "options": "Java"
   },
   {
+   "fieldname": "solution_section",
+   "fieldtype": "Section Break",
+   "label": "Official Solutions"
+  },
+  {
+   "fieldname": "solution_cpp",
+   "fieldtype": "Code",
+   "label": "C++ Solution",
+   "options": "C++"
+  },
+  {
+   "fieldname": "solution_python",
+   "fieldtype": "Code",
+   "label": "Python Solution",
+   "options": "Python"
+  },
+  {
+   "fieldname": "solution_javascript",
+   "fieldtype": "Code",
+   "label": "JavaScript Solution",
+   "options": "JavaScript"
+  },
+  {
+   "fieldname": "solution_java",
+   "fieldtype": "Code",
+   "label": "Java Solution",
+   "options": "Java"
+  },
+  {
+   "fieldname": "solution_xp_deduction",
+   "fieldtype": "Int",
+   "label": "XP Deduction for Solution",
+   "default": "0"
+  },
+  {
    "fieldname": "test_cases",
    "fieldtype": "Table",
    "label": "Test Cases",
@@ -167,13 +208,13 @@
    "fieldname": "time_complexity",
    "fieldtype": "Select",
    "label": "Time Complexity",
-   "options": "O(1)\nO(log n)\nO(n)\nO(n log n)\nO(n\u00b2)\nO(n\u00b3)\nO(2^n)\nO(n!)"
+   "options": "O(1)\nO(log n)\nO(n)\nO(n log n)\nO(n²)\nO(n³)\nO(2^n)\nO(n!)"
   },
   {
    "fieldname": "space_complexity",
    "fieldtype": "Select",
    "label": "Space Complexity",
-   "options": "O(1)\nO(log n)\nO(n)\nO(n log n)\nO(n\u00b2)\nO(n\u00b3)\nO(2^n)\nO(n!)"
+   "options": "O(1)\nO(log n)\nO(n)\nO(n log n)\nO(n²)\nO(n³)\nO(2^n)\nO(n!)"
   },
   {
    "default": "0",

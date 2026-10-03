@@ -7,7 +7,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
-const __ = window.__;
+const __ = window.__ || ((text) => text);
 const MONACO_BASE_URL =
 	"/assets/dsa/node_modules/monaco-editor/min/vs";
 

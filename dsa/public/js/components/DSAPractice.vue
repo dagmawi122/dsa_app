@@ -436,6 +436,30 @@
 							<div class="dsa-terminal-header">
 								<div class="dsa-result-tabs">
 									<button
+										v-if="!props.contestMode"
+										type="button"
+										:class="{ 'is-active': activeResultTab === 'solution' }"
+										@click="selectSolutionTab"
+									>
+										<svg
+											class="dsa-solution-tab-icon"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<path d="M9 3h6" />
+											<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+											<path d="M8 14h8" />
+											<path d="M9.5 17h5" />
+										</svg>
+										{{ __("Solution") }}
+									</button>
+
+									<button
 										type="button"
 										:class="{ 'is-active': activeResultTab === 'testcase' }"
 										@click="activeResultTab = 'testcase'"
@@ -467,8 +491,134 @@
 							</div>
 
 							<div class="dsa-terminal-output">
+								<!-- Official Solution (read-only viewer; never Monaco, never v-html) -->
 								<div
-									v-if="activeResultTab === 'testcase'"
+									v-if="activeResultTab === 'solution'"
+									class="dsa-solution-output"
+								>
+									<div
+										v-if="solutionLoading"
+										class="dsa-solution-state"
+										role="status"
+										aria-live="polite"
+									>
+										<svg
+											class="dsa-solution-state-icon"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<path d="M9 3h6" />
+											<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+											<path d="M8 14h8" />
+											<path d="M9.5 17h5" />
+										</svg>
+										<strong>{{ __("Opening solution…") }}</strong>
+										<span>{{ __("Please wait") }}</span>
+										<span class="dsa-solution-spinner" aria-hidden="true"></span>
+									</div>
+
+									<div
+										v-else-if="solutionError"
+										class="dsa-solution-state is-error"
+										role="alert"
+									>
+										<strong>{{ solutionErrorTitle }}</strong>
+										<p>{{ solutionError }}</p>
+										<button
+											v-if="solutionErrorKind !== 'unavailable'"
+											type="button"
+											class="dsa-solution-button"
+											@click="retrySolution"
+										>
+											{{ __("Retry") }}
+										</button>
+									</div>
+
+									<div
+										v-else-if="solutionUnlocked && solutionContent"
+										class="dsa-solution-viewer"
+									>
+										<div class="dsa-solution-header">
+											<div>
+												<div class="dsa-solution-title">
+													<svg
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="1.8"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														aria-hidden="true"
+													>
+														<path d="M9 3h6" />
+														<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+														<path d="M8 14h8" />
+														<path d="M9.5 17h5" />
+													</svg>
+													{{ __("Official Solution") }}
+												</div>
+												<div class="dsa-solution-subtitle">
+													{{ __("Editorial implementation") }}
+												</div>
+											</div>
+
+											<span class="dsa-solution-language">{{
+												solutionLanguageLabel
+											}}</span>
+										</div>
+
+										<div
+											class="dsa-solution-code"
+											tabindex="0"
+											role="region"
+											:aria-label="__('Official solution code')"
+										><pre><code>{{ solutionContent }}</code></pre></div>
+									</div>
+
+									<div v-else class="dsa-solution-state">
+										<svg
+											class="dsa-solution-state-icon"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<path d="M9 3h6" />
+											<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+											<path d="M8 14h8" />
+											<path d="M9.5 17h5" />
+										</svg>
+										<strong>{{
+											solutionFree
+												? __("Official Solution")
+												: __("Official Solution is locked")
+										}}</strong>
+										<span v-if="!solutionFree && solutionCost > 0">
+											{{ __("Unlock it once for") }} {{ solutionCost }} XP
+										</span>
+										<span v-else-if="solutionFree && problem.solved && !solutionUnlocked">
+											{{ __("Free — you already solved this problem") }}
+										</span>
+										<button
+											type="button"
+											class="dsa-solution-button is-primary"
+											@click="solutionFree ? requestSolution() : openSolutionConfirm()"
+										>
+											{{ solutionFree ? __("View Solution") : __("Unlock Solution") }}
+										</button>
+									</div>
+								</div>
+
+								<div
+									v-else-if="activeResultTab === 'testcase'"
 									class="dsa-testcase-input"
 								>
 									<div class="dsa-case-tabs">
@@ -536,6 +686,12 @@
 											class="dsa-xp-line"
 										>
 											<span>{{ __("Already solved") }}</span>
+										</div>
+										<div
+											v-else-if="resultXp && resultXp.solution_first"
+											class="dsa-xp-line"
+										>
+											<span>{{ __("No XP awarded — the official solution was opened first") }}</span>
 										</div>
 										<div
 											v-else-if="resultXp && resultXp.error"
@@ -688,11 +844,126 @@
 				</div>
 			</Transition>
 		</Teleport>
+
+		<!--
+			Official Solution confirmation. Shown only for a problem the backend has
+			not unlocked yet. The cost comes from problem.solution_xp_deduction; the
+			backend validates and deducts the XP.
+		-->
+		<Teleport to="body">
+			<Transition name="dsa-solution-modal-fade">
+				<div
+					v-if="showSolutionConfirm"
+					class="dsa-solution-modal-backdrop"
+					@click.self="closeSolutionConfirm"
+					@keydown.esc="closeSolutionConfirm"
+				>
+					<div
+						class="dsa-solution-modal"
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby="dsa-solution-modal-title"
+					>
+						<div class="dsa-solution-modal-icon">
+							<svg
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.8"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M9 3h6" />
+								<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+								<path d="M8 14h8" />
+								<path d="M9.5 17h5" />
+							</svg>
+						</div>
+
+						<h2 id="dsa-solution-modal-title">{{ __("Official Solution") }}</h2>
+
+						<p class="dsa-solution-modal-lead">
+							{{
+								solutionCost > 0
+									? __("Opening this solution costs")
+									: __("Opening this solution is free")
+							}}
+						</p>
+
+						<div v-if="solutionCost > 0" class="dsa-solution-modal-cost">
+							{{ solutionCost }}<span>XP</span>
+						</div>
+
+						<p v-if="xpLoaded" class="dsa-solution-modal-balance">
+							{{ __("Your current XP") }}: <strong>{{ xpTotal }}</strong>
+						</p>
+
+						<p class="dsa-solution-modal-note">
+							{{
+								solutionCost > 0
+									? __("You only pay once for this problem.")
+									: __("No XP will be spent. You can reopen it any time.")
+							}}
+						</p>
+
+						<p v-if="solutionForfeitsXp" class="dsa-solution-modal-warning">
+							{{ __("Opening the solution before solving this problem means solving it will not award its") }}
+							{{ problem.xp_reward }} XP.
+						</p>
+
+						<div
+							v-if="solutionInsufficientXp && !solutionError"
+							class="dsa-solution-modal-error"
+							role="alert"
+						>
+							<strong>{{ __("Not enough XP") }}</strong>
+							<span>
+								{{ __("You don't have enough XP to open this solution.") }}
+								{{ __("You need") }} {{ solutionCost }} XP,
+								{{ __("but you only have") }} {{ xpTotal }} XP.
+							</span>
+						</div>
+
+						<div v-if="solutionError" class="dsa-solution-modal-error" role="alert">
+							<strong>{{ solutionErrorTitle }}</strong>
+							<span>{{ solutionError }}</span>
+						</div>
+
+						<div class="dsa-solution-modal-actions">
+							<button
+								ref="solutionCancelButton"
+								type="button"
+								class="dsa-solution-button"
+								:disabled="solutionLoading"
+								@click="closeSolutionConfirm"
+							>
+								{{ __("Cancel") }}
+							</button>
+
+							<button
+								type="button"
+								class="dsa-solution-button is-primary"
+								:disabled="solutionLoading || solutionInsufficientXp"
+								@click="confirmSolutionUnlock"
+							>
+								<span
+									v-if="solutionLoading"
+									class="dsa-solution-spinner is-small"
+									aria-hidden="true"
+								></span>
+								{{ __("Unlock Solution") }}
+							</button>
+						</div>
+					</div>
+				</div>
+			</Transition>
+		</Teleport>
 	</div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import MonacoEditor from "./MonacoEditor.vue";
 
 const elapsedTime = ref(0);
@@ -804,6 +1075,19 @@ const xpToast = ref(null);
 const XP_TOAST_VISIBLE_MS = 4500;
 let xpToastTimer = null;
 
+// --- Official Solution --------------------------------------------------
+// The backend (dsa.api.open_solution / check_solution_unlock) owns the unlock,
+// the XP deduction and the solution text. These refs only hold what it told us.
+const solutionUnlocked = ref(false);
+const solutionLoading = ref(false);
+const solutionError = ref("");
+const solutionErrorKind = ref(""); // "", "xp", "unavailable" or "error"
+const solutionContent = ref("");
+const solutionLanguageId = ref(null); // language the loaded solution is written in
+const showSolutionConfirm = ref(false);
+const solutionCancelButton = ref(null);
+let solutionRequestId = 0;
+
 let generation = 0;
 let nextTestCaseKey = 2;
 let previousLanguageId = 54;
@@ -826,6 +1110,39 @@ const selectedLanguage = computed(
 );
 
 const activeTestResult = computed(() => testResults.value[activeResultCaseIndex.value] || null);
+
+const solutionCost = computed(() => Math.max(0, Number(problem.value?.solution_xp_deduction) || 0));
+
+// UI hint only — the backend decides. A problem the user already solved (backend
+// `solved`, loaded by get_problem) or already unlocked opens without a confirmation.
+const solutionFree = computed(() => solutionUnlocked.value || Boolean(problem.value?.solved));
+
+// UI hint only: the user would have to pay and cannot afford it. The backend
+// (deduct_xp) still validates, so a stale number here can never overspend.
+const solutionInsufficientXp = computed(
+	() =>
+		xpLoaded.value &&
+		!solutionFree.value &&
+		solutionCost.value > 0 &&
+		xpTotal.value < solutionCost.value
+);
+
+// Warn only when paying for the solution would cost the user the problem's XP reward.
+const solutionForfeitsXp = computed(
+	() => !props.contestMode && Number(problem.value?.xp_reward) > 0 && !solutionFree.value
+);
+
+const solutionLanguageLabel = computed(
+	() =>
+		languages.find((language) => language.id === solutionLanguageId.value)?.label ||
+		selectedLanguage.value.label
+);
+
+const solutionErrorTitle = computed(() => {
+	if (solutionErrorKind.value === "xp") return __("Not enough XP");
+	if (solutionErrorKind.value === "unavailable") return __("No solution available");
+	return __("Couldn't open the solution");
+});
 
 function formatTime(seconds) {
 	const minutes = Math.floor(seconds / 60);
@@ -1036,6 +1353,10 @@ function applyXpResult(result) {
 
 	resultXp.value = xp || null;
 
+	// A final Accepted verdict (complexity rejections come back as "Failed") means
+	// the backend now counts this problem as solved, whatever XP was awarded.
+	if (result?.status === "Accepted" && problem.value) problem.value.solved = true;
+
 	if (!xp) return;
 
 	const total = Number(xp.total);
@@ -1135,6 +1456,241 @@ function clearResults() {
     activeResultCaseIndex.value = 0;
 	resultXp.value = null;
 }
+
+// ---------------------------------------------------------------------
+// Official Solution
+// ---------------------------------------------------------------------
+
+// Clears only Solution state. Called whenever a problem is (re)loaded so one
+// problem's solution can never remain visible on another.
+function resetSolutionState() {
+	solutionRequestId += 1; // invalidates any in-flight request
+	solutionUnlocked.value = false;
+	solutionLoading.value = false;
+	solutionError.value = "";
+	solutionErrorKind.value = "";
+	solutionContent.value = "";
+	solutionLanguageId.value = null;
+	showSolutionConfirm.value = false;
+}
+
+function plainText(html) {
+	return (
+		new DOMParser().parseFromString(String(html || ""), "text/html").body.textContent || ""
+	).trim();
+}
+
+// Turns a frappe.call failure into a clean message. Prefers the backend's own
+// message and never surfaces a raw JavaScript error.
+function solutionErrorMessage(error) {
+	const raw = error?._server_messages || error?.responseJSON?._server_messages;
+
+	if (raw) {
+		try {
+			const messages = JSON.parse(raw)
+				.map((entry) => {
+					try {
+						return JSON.parse(entry).message;
+					} catch (e) {
+						return entry;
+					}
+				})
+				.filter(Boolean);
+
+			const text = plainText(messages.join("\n"));
+			if (text) return text;
+		} catch (e) {
+			// fall through to the other sources
+		}
+	}
+
+	if (Array.isArray(error?.messages) && error.messages.length) {
+		const text = plainText(error.messages.join("\n"));
+		if (text) return text;
+	}
+
+	if (!(error instanceof Error) && typeof error?.message === "string" && error.message) {
+		const text = plainText(error.message);
+		if (text) return text;
+	}
+
+	return __("Could not open the solution. Please check your connection and try again.");
+}
+
+function solutionUnavailableMessage(languageId) {
+	const label = languages.find((language) => language.id === languageId)?.label || "";
+	return `${__("No official solution is available for")} ${label}.`;
+}
+
+// Asks the backend whether this user already unlocked this problem (no code
+// is returned). A failure just leaves the problem "locked" in the UI; the
+// backend still never charges twice.
+async function checkSolutionUnlock(problemName) {
+	if (props.contestMode || !problemName) return;
+
+	try {
+		const result = await call("dsa.api.check_solution_unlock", { problem: problemName });
+
+		if (disposed || problem.value?.name !== problemName) return;
+
+		solutionUnlocked.value = Boolean(result?.unlocked);
+
+		// The user clicked Solution before this answer arrived.
+		if (
+			solutionUnlocked.value &&
+			activeResultTab.value === "solution" &&
+			!solutionLoading.value &&
+			!solutionContent.value
+		) {
+			showSolutionConfirm.value = false;
+			requestSolution();
+		}
+	} catch (error) {
+		console.error("Failed to check solution unlock:", error);
+	}
+}
+
+function openSolutionConfirm() {
+	solutionError.value = "";
+	solutionErrorKind.value = "";
+	showSolutionConfirm.value = true;
+}
+
+function closeSolutionConfirm() {
+	if (solutionLoading.value) return;
+
+	showSolutionConfirm.value = false;
+	solutionError.value = "";
+	solutionErrorKind.value = "";
+}
+
+function confirmSolutionUnlock() {
+	if (solutionLoading.value || solutionInsufficientXp.value) return;
+
+	requestSolution();
+}
+
+function retrySolution() {
+	if (solutionFree.value) {
+		requestSolution();
+	} else {
+		openSolutionConfirm();
+	}
+}
+
+function selectSolutionTab() {
+	activeResultTab.value = "solution";
+
+	if (solutionLoading.value) return;
+
+	// Not solved and not unlocked: ask for confirmation before spending XP.
+	// Solved or already unlocked: no modal — the backend returns it for free.
+	if (!solutionFree.value) {
+		openSolutionConfirm();
+		return;
+	}
+
+	if (solutionContent.value && solutionLanguageId.value === selectedLanguageId.value) {
+		solutionError.value = "";
+		solutionErrorKind.value = "";
+		return;
+	}
+
+	requestSolution();
+}
+
+// The ONLY place that talks to dsa.api.open_solution. The backend validates the
+// XP, deducts it once per user + problem and returns the language's solution.
+async function requestSolution() {
+	if (!problem.value || props.contestMode) return;
+
+	const problemName = problem.value.name;
+	const languageId = selectedLanguageId.value;
+	const requestId = ++solutionRequestId;
+
+	solutionLoading.value = true;
+	solutionError.value = "";
+	solutionErrorKind.value = "";
+
+	try {
+		const result = await call(
+			"dsa.api.open_solution",
+			{ problem: problemName, language_id: languageId },
+			"POST"
+		);
+
+		if (disposed || requestId !== solutionRequestId) return;
+
+		if (!result || typeof result.solution !== "string" || !result.solution.trim()) {
+			showSolutionConfirm.value = false;
+			solutionErrorKind.value = "unavailable";
+			solutionError.value = solutionUnavailableMessage(languageId);
+			return;
+		}
+
+		solutionContent.value = result.solution;
+		solutionLanguageId.value = Number(result.language_id) || languageId;
+		solutionUnlocked.value = true;
+		if (result.solved && problem.value) problem.value.solved = true;
+		showSolutionConfirm.value = false;
+		activeResultTab.value = "solution";
+
+		// Display only: the backend already deducted the XP.
+		const remaining = Number(result.remaining_xp);
+		if (result.remaining_xp !== null && result.remaining_xp !== undefined && Number.isFinite(remaining)) {
+			xpTotal.value = remaining;
+			xpLoaded.value = true;
+		}
+
+		// The language was changed while this request was in flight.
+		if (selectedLanguageId.value !== languageId) {
+			requestSolution();
+		}
+	} catch (error) {
+		if (disposed || requestId !== solutionRequestId) return;
+
+		const message = solutionErrorMessage(error);
+		let kind = "error";
+
+		if (/no official solution|unsupported programming language|not supported/i.test(message)) {
+			kind = "unavailable";
+		} else if (/\bxp\b/i.test(message)) {
+			kind = "xp";
+		}
+
+		solutionErrorKind.value = kind;
+
+		if (kind === "unavailable") {
+			showSolutionConfirm.value = false;
+			solutionError.value = solutionUnavailableMessage(languageId);
+		} else {
+			solutionError.value = message;
+		}
+	} finally {
+		if (requestId === solutionRequestId) {
+			solutionLoading.value = false;
+		}
+	}
+}
+
+// Unlock is per user + problem, not per language: after a language change the
+// solution for the new language is requested (the backend charges 0 XP).
+watch(selectedLanguageId, () => {
+	if (props.contestMode || solutionLoading.value) return;
+
+	solutionError.value = "";
+	solutionErrorKind.value = "";
+
+	if (activeResultTab.value === "solution" && solutionFree.value && problem.value) {
+		requestSolution();
+	}
+});
+
+watch(showSolutionConfirm, (isOpen) => {
+	if (isOpen) {
+		nextTick(() => solutionCancelButton.value?.focus());
+	}
+});
 
 async function selectProblemTab(tab) {
 	activeProblemTab.value = tab;
@@ -1350,6 +1906,11 @@ async function loadProblem(name, slug = null) {
 	showHint.value = false;
 	activeResultTab.value = "testcase";
 	submissions.value = [];
+
+	// Official Solution: never carry one problem's solution into another.
+	// Not awaited — the unlock check must never delay or break problem loading.
+	resetSolutionState();
+	checkSolutionUnlock(problem.value.name);
 
 	if (props.contestMode) {
 		await loadContestProgress();
@@ -2998,6 +3559,382 @@ function formatMemory(memory) {
 		right: 12px;
 		bottom: 12px;
 		left: 12px;
+	}
+}
+
+/* ============================================================
+   OFFICIAL SOLUTION
+   Solution-specific styles only. Colors come from the existing theme
+   variables, so light/dark follow the rest of the page.
+   ============================================================ */
+
+/* Tab icon: inherits the tab color, turns blue when the tab is active. */
+.dsa-solution-tab-icon {
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
+	color: inherit;
+}
+
+.dsa-result-tabs > button.is-active .dsa-solution-tab-icon {
+	color: var(--text-on-blue);
+}
+
+/* Terminal content */
+.dsa-solution-output {
+	display: flex;
+	height: 100%;
+	min-height: 120px;
+	flex-direction: column;
+	font-family: var(--font-stack);
+}
+
+.dsa-solution-viewer {
+	display: flex;
+	min-height: 0;
+	flex: 1;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	background: var(--control-bg);
+}
+
+.dsa-solution-header {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 9px 14px;
+	border-bottom: 1px solid var(--border-color);
+	background: var(--card-bg);
+}
+
+.dsa-solution-title {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--text-color);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.dsa-solution-title svg {
+	width: 15px;
+	height: 15px;
+	flex-shrink: 0;
+	color: var(--text-on-blue);
+}
+
+.dsa-solution-subtitle {
+	margin: 2px 0 0 22px;
+	color: var(--text-muted);
+	font-size: 11px;
+}
+
+.dsa-solution-language {
+	padding: 3px 10px;
+	border: 1px solid var(--border-color);
+	border-radius: 999px;
+	background: var(--control-bg);
+	color: var(--text-on-blue);
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.dsa-solution-code {
+	min-height: 0;
+	flex: 1;
+	overflow: auto;
+	outline: none;
+}
+
+.dsa-solution-code:focus-visible {
+	box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.dsa-solution-output .dsa-solution-code pre {
+	min-width: max-content;
+	margin: 0;
+	padding: 14px 16px;
+	overflow: visible;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-color);
+	font-family: var(--font-stack-monospace);
+	font-size: 12.5px;
+	line-height: 1.65;
+	tab-size: 4;
+	white-space: pre;
+}
+
+.dsa-solution-output .dsa-solution-code code {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	white-space: inherit;
+}
+
+/* Loading / error / locked states */
+.dsa-solution-state {
+	display: flex;
+	min-height: 0;
+	flex: 1;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 12px;
+	color: var(--text-muted);
+	font-size: 12px;
+	text-align: center;
+}
+
+.dsa-solution-state strong {
+	color: var(--text-color);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.dsa-solution-state p {
+	max-width: 380px;
+	margin: 0;
+	line-height: 1.5;
+}
+
+.dsa-solution-state-icon {
+	width: 26px;
+	height: 26px;
+	color: var(--text-on-blue);
+}
+
+.dsa-solution-state.is-error strong {
+	color: var(--text-on-red);
+}
+
+.dsa-solution-spinner {
+	display: inline-block;
+	width: 22px;
+	height: 22px;
+	flex-shrink: 0;
+	margin-top: 6px;
+	border: 2px solid var(--border-color);
+	border-top-color: var(--text-on-blue);
+	border-radius: 50%;
+	animation: dsa-solution-spin 0.8s linear infinite;
+}
+
+.dsa-solution-spinner.is-small {
+	width: 12px;
+	height: 12px;
+	margin-top: 0;
+	border-color: currentColor;
+	border-top-color: transparent;
+	opacity: 0.8;
+}
+
+@keyframes dsa-solution-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Buttons (panel + modal) */
+.dsa-solution-button {
+	display: inline-flex;
+	height: 32px;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	margin-top: 6px;
+	padding: 0 16px;
+	border: 1px solid var(--border-color);
+	border-radius: 7px;
+	background: var(--control-bg);
+	color: var(--text-color);
+	font-family: var(--font-stack);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.dsa-solution-button:hover:not(:disabled) {
+	background: var(--fg-hover-color);
+}
+
+.dsa-solution-button:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
+
+.dsa-solution-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.dsa-solution-button.is-primary {
+	border-color: #2a62c4;
+	background: #2f6fe4;
+	color: #fff;
+}
+
+.dsa-solution-button.is-primary:hover:not(:disabled) {
+	background: #3b7bf0;
+}
+
+/* Confirmation modal */
+.dsa-solution-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 2100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+	background: rgba(0, 0, 0, 0.55);
+}
+
+.dsa-solution-modal {
+	display: flex;
+	width: min(400px, 100%);
+	flex-direction: column;
+	align-items: center;
+	padding: 28px 28px 22px;
+	border: 1px solid var(--border-color);
+	border-radius: 14px;
+	background: var(--card-bg);
+	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+	color: var(--text-color);
+	font-family: var(--font-stack);
+	text-align: center;
+}
+
+.dsa-solution-modal-icon {
+	display: grid;
+	width: 56px;
+	height: 56px;
+	place-items: center;
+	margin-bottom: 14px;
+	border-radius: 50%;
+	background: rgba(75, 139, 245, 0.14);
+	color: var(--text-on-blue);
+}
+
+.dsa-solution-modal-icon svg {
+	width: 28px;
+	height: 28px;
+}
+
+.dsa-solution-modal h2 {
+	margin: 0 0 14px;
+	color: var(--text-color);
+	font-size: 18px;
+	font-weight: 650;
+}
+
+.dsa-solution-modal-lead {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.dsa-solution-modal-cost {
+	margin: 2px 0 8px;
+	color: var(--text-on-orange);
+	font-size: 40px;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.dsa-solution-modal-cost span {
+	margin-left: 6px;
+	font-size: 18px;
+	font-weight: 600;
+}
+
+.dsa-solution-modal-balance {
+	margin: 0 0 10px;
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.dsa-solution-modal-balance strong {
+	color: var(--text-color);
+	font-variant-numeric: tabular-nums;
+}
+
+.dsa-solution-modal-note {
+	max-width: 300px;
+	margin: 0 0 4px;
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.dsa-solution-modal-warning {
+	max-width: 320px;
+	margin: 8px 0 0;
+	color: var(--text-on-orange);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.dsa-solution-modal-error {
+	display: flex;
+	width: 100%;
+	flex-direction: column;
+	gap: 3px;
+	margin-top: 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--text-on-red);
+	border-radius: 8px;
+	background: rgba(220, 38, 38, 0.08);
+	font-size: 12px;
+	line-height: 1.45;
+	text-align: left;
+}
+
+.dsa-solution-modal-error strong {
+	color: var(--text-on-red);
+}
+
+.dsa-solution-modal-actions {
+	display: flex;
+	width: 100%;
+	justify-content: center;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.dsa-solution-modal-actions .dsa-solution-button {
+	min-width: 120px;
+	margin-top: 0;
+}
+
+.dsa-solution-modal-fade-enter-active,
+.dsa-solution-modal-fade-leave-active {
+	transition: opacity 0.18s ease;
+}
+
+.dsa-solution-modal-fade-enter-from,
+.dsa-solution-modal-fade-leave-to {
+	opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dsa-solution-modal-fade-enter-active,
+	.dsa-solution-modal-fade-leave-active {
+		transition: none;
+	}
+
+	.dsa-solution-spinner {
+		animation-duration: 2s;
 	}
 }
 </style>

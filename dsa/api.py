@@ -12,9 +12,10 @@ from frappe.utils import cint, now_datetime
 
 from dsa.dsa.doctype.contest.contest import get_contest_status
 from dsa.problem_routes import make_problem_slug
-from dsa.xp import get_problem_xp, get_total_xp, settle_submission_xp
+from dsa.xp import deduct_xp, get_problem_xp, get_total_xp, settle_submission_xp
 
 DEFAULT_JUDGE0_URL = "https://ce.judge0.com"
+SOLUTION_UNLOCK_DOCTYPE = "DSA Solution Unlock"
 DEFAULT_LANGUAGE_ID = 54  # C++ (GCC 9.2.0)
 PENDING_STATUS_IDS = {1, 2}
 COMPLEXITY_RANK = {
@@ -51,6 +52,12 @@ LANGUAGE_CODE_FIELDS = {
 	71: ("custom_python_starter_code", "custom_python_wrapper_code"),
 	63: ("custom_javascript_starter_code", "custom_javascript_wrapper_code"),
 	62: ("custom_java_starter_code", "custom_java_wrapper_code"),
+}
+SOLUTION_FIELDS = {
+    54: "solution_cpp",
+    71: "solution_python",
+    63: "solution_javascript",
+    62: "solution_java",
 }
 
 
@@ -119,6 +126,19 @@ def _language_code_fields(language_id: int) -> tuple[str, str]:
 	return LANGUAGE_CODE_FIELDS[language_id]
 
 
+def _solution_field(language_id):
+	try:
+		language_id = int(language_id)
+	except (TypeError, ValueError):
+		language_id = DEFAULT_LANGUAGE_ID
+
+	fieldname = SOLUTION_FIELDS.get(language_id)
+
+	if not fieldname:
+		frappe.throw(_("Unsupported programming language."))
+
+	return fieldname
+
 def _build_source_code(problem: "frappe.model.document.Document", user_code: str, language_id: int) -> str:
 	"""Insert editor code into the problem's hidden, language-specific wrapper."""
 	_wrapper_field = _language_code_fields(language_id)[1]
@@ -164,6 +184,7 @@ def _problem_payload(problem: "frappe.model.document.Document") -> dict[str, Any
 		"space_complexity": problem.space_complexity,
 		"starter_code": starter_codes[str(DEFAULT_LANGUAGE_ID)],
 		"starter_codes": starter_codes,
+		"solution_xp_deduction": cint(problem.solution_xp_deduction or 0),
 		"test_cases": [
 			{"index": index, "input": row.custom_input or ""}
 			for index, row in enumerate(problem.test_cases, start=1)
@@ -216,6 +237,153 @@ def get_problems() -> list[dict[str, Any]]:
             problem.title,
         ),
     )
+@frappe.whitelist(methods=["POST"])
+def open_solution(
+	problem: str,
+	language_id: int = DEFAULT_LANGUAGE_ID,
+) -> dict[str, Any]:
+	"""Return an official solution for a DSA problem.
+
+	Free (no XP, no unlock record) when the user has already solved the problem.
+	Free when the user already unlocked it earlier.
+	Otherwise the first successful request deducts the configured XP cost and
+	creates a DSA Solution Unlock record.
+	"""
+	user = _require_login()
+
+	if not problem:
+		frappe.throw(_("Problem is required."))
+
+	try:
+		language_id = int(language_id)
+	except (TypeError, ValueError):
+		language_id = DEFAULT_LANGUAGE_ID
+
+	# Validate the language before doing anything with XP.
+	solution_field = _solution_field(language_id)
+
+	# Load the problem.
+	problem_doc = frappe.get_doc("DSAProblem", problem)
+
+	# Get the language-specific official solution.
+	solution = problem_doc.get(solution_field)
+
+	if not solution or not solution.strip():
+		frappe.throw(
+			_("No official solution is available for the selected language.")
+		)
+
+	# One unlock per user + problem.
+	unlock_key = f"{user}::{problem}"
+
+	# Has this user solved the problem (accepted submission)?
+	solved = _user_has_solved(user, problem)
+
+	# Has this user already unlocked this problem?
+	existing = frappe.db.get_value(
+		SOLUTION_UNLOCK_DOCTYPE,
+		{"unlock_key": unlock_key},
+		["name", "xp_deducted", "unlocked_at"],
+		as_dict=True,
+	)
+
+	# Solved it themselves, or unlocked earlier: free, no deduction, no new record.
+	if solved or existing:
+		return {
+			"success": True,
+			"already_unlocked": bool(existing),
+			"solved": solved,
+			"xp_deducted": 0,
+			"remaining_xp": get_total_xp(user),
+			"solution": solution,
+			"language_id": language_id,
+		}
+
+	xp_cost = cint(problem_doc.solution_xp_deduction or 0)
+
+	# Everything from this point must succeed together.
+	frappe.db.savepoint("solution_unlock")
+
+	try:
+		if xp_cost > 0:
+			xp_result = deduct_xp(user, xp_cost)
+		else:
+			xp_result = {
+				"deducted": 0,
+				"remaining": get_total_xp(user),
+			}
+
+		unlock = frappe.get_doc(
+			{
+				"doctype": SOLUTION_UNLOCK_DOCTYPE,
+				"unlock_key": unlock_key,
+				"user": user,
+				"problem": problem,
+				"xp_deducted": xp_cost,
+				"unlocked_at": now_datetime(),
+			}
+		)
+
+		unlock.insert(ignore_permissions=True)
+
+		frappe.db.commit()
+
+	except (frappe.DuplicateEntryError, frappe.UniqueValidationError):
+		# Another request unlocked the same problem at the same time.
+		#
+		# Roll back our transaction so our XP deduction is undone.
+		frappe.db.rollback(save_point="solution_unlock")
+
+		existing = frappe.db.get_value(
+			SOLUTION_UNLOCK_DOCTYPE,
+			{"unlock_key": unlock_key},
+			["name", "xp_deducted", "unlocked_at"],
+			as_dict=True,
+		)
+
+		if not existing:
+			frappe.throw(
+				_("Could not unlock the solution. Please try again.")
+			)
+
+		return {
+			"success": True,
+			"already_unlocked": True,
+			"solved": False,
+			"xp_deducted": 0,
+			"remaining_xp": get_total_xp(user),
+			"solution": solution,
+			"language_id": language_id,
+		}
+
+	except Exception:
+		frappe.db.rollback(save_point="solution_unlock")
+		raise
+
+	return {
+		"success": True,
+		"already_unlocked": False,
+		"solved": False,
+		"xp_deducted": xp_result["deducted"],
+		"remaining_xp": xp_result["remaining"],
+		"solution": solution,
+		"language_id": language_id,
+	}
+
+@frappe.whitelist()
+def check_solution_unlock(problem: str) -> dict[str, bool]:
+	user = _require_login()
+
+	if not problem:
+		frappe.throw(_("Problem is required."))
+
+	unlock_key = f"{user}::{problem}"
+
+	return {
+		"unlocked": bool(
+			frappe.db.exists(SOLUTION_UNLOCK_DOCTYPE, {"unlock_key": unlock_key})
+		)
+	}
 
 
 @frappe.whitelist()
@@ -2464,3 +2632,10 @@ def start_contest_problem(
         "solved": bool(accepted_submission_time),
         "frozen_seconds": frozen_seconds,
     }
+
+def _user_has_solved(user: str, problem: str) -> bool:
+	return bool(
+		frappe.db.exists(
+			"DSA Submission", {"member": user, "problem": problem, "status": "Accepted"}
+		)
+	)

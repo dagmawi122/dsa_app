@@ -20,7 +20,18 @@ from __future__ import annotations
 from typing import Any
 
 import frappe
-from frappe.utils import cint, now_datetime
+from frappe import _
+from frappe.utils import cint, get_datetime, now_datetime
+
+SOLUTION_UNLOCK_DOCTYPE = "DSA Solution Unlock"
+
+
+def solution_unlocked_before(user: str, problem: str, when) -> bool:
+	"""True if the user opened the official solution before `when`."""
+	unlocked_at = frappe.db.get_value(
+		SOLUTION_UNLOCK_DOCTYPE, {"unlock_key": award_key(user, problem)}, "unlocked_at"
+	)
+	return bool(unlocked_at and when and get_datetime(unlocked_at) < get_datetime(when))
 
 XP_DOCTYPE = "XP"
 AWARD_DOCTYPE = "DSA XP Award"
@@ -68,26 +79,17 @@ def _add_to_total(user: str, amount: int) -> None:
 	)
 
 
-def xp_payload(
-	awarded: bool = False,
-	gained: int = 0,
-	total: int = 0,
-	already_awarded: bool = False,
-	error: str | None = None,
-) -> dict[str, Any]:
-	"""Shape sent to the browser. The frontend never infers XP from status."""
+def xp_payload(awarded=False, gained=0, total=0, already_awarded=False, error=None, solution_first=False):
 	return {
 		"awarded": bool(awarded),
 		"gained": cint(gained),
 		"total": cint(total),
 		"already_awarded": bool(already_awarded),
+		"solution_first": bool(solution_first),
 		"error": error,
 	}
 
 
-# ---------------------------------------------------------------------
-# Core: idempotent award
-# ---------------------------------------------------------------------
 
 
 def award_problem_xp(user: str, problem: str, submission: str) -> dict[str, Any]:
@@ -98,7 +100,10 @@ def award_problem_xp(user: str, problem: str, submission: str) -> dict[str, Any]
 	(the caller logs them); a duplicate is NOT an error.
 	"""
 	row = frappe.db.get_value(
-		"DSA Submission", submission, ["member", "problem", "status"], as_dict=True
+		"DSA Submission",
+		submission,
+		["member", "problem", "status", "creation"],
+		as_dict=True,
 	)
 	if not row:
 		frappe.throw(f"DSA Submission {submission} not found.", frappe.DoesNotExistError)
@@ -111,6 +116,7 @@ def award_problem_xp(user: str, problem: str, submission: str) -> dict[str, Any]
 		"xp_gained": 0,
 		"total_xp": get_total_xp(user),
 		"already_awarded": False,
+		"solution_first": False,
 		"award": None,
 	}
 
@@ -129,6 +135,11 @@ def award_problem_xp(user: str, problem: str, submission: str) -> dict[str, Any]
 	existing = _existing()
 	if existing:
 		result.update(already_awarded=True, award=existing)
+		return result
+
+	# Solution opened BEFORE this accepted submission -> no problem XP.
+	if solution_unlocked_before(user, problem, row.creation):
+		result["solution_first"] = True
 		return result
 
 	frappe.db.savepoint(SAVEPOINT)
@@ -238,3 +249,75 @@ def settle_submission_xp(submission, report: bool = False) -> dict[str, Any]:
 			total=total,
 			error="XP could not be recorded. The submission result is unaffected; see Error Log.",
 		)
+
+def deduct_xp(user: str, amount: int) -> dict[str, Any]:
+	"""Atomically deduct XP from a user's balance."""
+	amount = cint(amount)
+
+	if amount <= 0:
+		return {
+			"deducted": 0,
+			"remaining": get_total_xp(user),
+		}
+
+	name = frappe.db.get_value(
+		XP_DOCTYPE,
+		{"user": user},
+		"name",
+	)
+
+	if not name:
+		frappe.throw(
+			_(
+				"You don't have enough XP to open this solution. "
+				"You need {0} XP, but you only have 0 XP."
+			).format(amount)
+		)
+
+	row = frappe.db.sql(
+		f"""
+		SELECT `name`, COALESCE(`value`, 0) AS `value`
+		FROM `tab{XP_DOCTYPE}`
+		WHERE `name` = %s
+		FOR UPDATE
+		""",
+		(name,),
+		as_dict=True,
+	)
+
+	if not row:
+		frappe.throw(
+			_(
+				"You don't have enough XP to open this solution. "
+				"You need {0} XP, but you only have 0 XP."
+			).format(amount)
+		)
+
+	current = cint(row[0].value)
+
+	if current < amount:
+		frappe.throw(
+			_(
+				"You don't have enough XP to open this solution. "
+				"You need {0} XP, but you only have {1} XP."
+			).format(
+				amount,
+				current,
+			)
+		)
+
+	remaining = current - amount
+
+	frappe.db.sql(
+		f"""
+		UPDATE `tab{XP_DOCTYPE}`
+		SET `value` = %s
+		WHERE `name` = %s
+		""",
+		(remaining, name),
+	)
+
+	return {
+		"deducted": amount,
+		"remaining": remaining,
+	}
