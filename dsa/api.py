@@ -2639,3 +2639,74 @@ def _user_has_solved(user: str, problem: str) -> bool:
 			"DSA Submission", {"member": user, "problem": problem, "status": "Accepted"}
 		)
 	)
+
+@frappe.whitelist()
+def get_xp_leaderboard(limit: int = 100) -> dict[str, Any]:
+	"""Rank every enabled user by total XP (read-only; uses the existing XP DocType).
+
+	Users without an XP record, or with 0 XP, are included with xp = 0.
+	"""
+	user = _require_login()
+	limit = min(max(cint(limit), 1), 1000)
+
+	users = frappe.get_all(
+		"User",
+		filters={
+			"enabled": 1,
+			"name": ["not in", ["Administrator", "Guest"]],
+		},
+		fields=["name", "full_name", "user_image"],
+	)
+
+	xp_by_user = {
+		row.user: cint(row.value)
+		for row in frappe.get_all("XP", fields=["user", "value"])
+	}
+
+	entries = [
+		{
+			"user": u.name,
+			"full_name": u.full_name or u.name,
+			"user_image": u.user_image,
+			"xp": max(xp_by_user.get(u.name, 0), 0),
+		}
+		for u in users
+	]
+
+	# Highest XP first, then alphabetical so the order is stable.
+	entries.sort(key=lambda e: (-e["xp"], (e["full_name"] or "").lower()))
+
+	previous_xp = None
+	current_rank = 0
+
+	for index, entry in enumerate(entries, start=1):
+		# Equal XP shares a rank (same tie behaviour as the contest leaderboard).
+		if entry["xp"] != previous_xp:
+			current_rank = index
+			previous_xp = entry["xp"]
+
+		entry["rank"] = current_rank
+
+	me = next((e for e in entries if e["user"] == user), None)
+
+	return {
+		"leaderboard": entries[:limit],
+		"me": me,  # included even if you're outside the top `limit`
+		"total": len(entries),
+	}
+
+@frappe.whitelist()
+def get_contest_participant_counts() -> dict[str, int]:
+	"""{contest_name: number of users who joined}"""
+	_require_login()
+
+	counts: dict[str, int] = {}
+
+	for contest in frappe.get_all(
+		"Contest Registration",
+		filters={"status": "Joined"},
+		pluck="contest",
+	):
+		counts[contest] = counts.get(contest, 0) + 1
+
+	return counts
