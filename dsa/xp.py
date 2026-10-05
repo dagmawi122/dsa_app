@@ -65,6 +65,9 @@ def get_problem_xp(problem: str) -> int:
 def get_total_xp(user: str) -> int:
 	return cint(frappe.db.get_value(XP_DOCTYPE, {"user": user}, "value") or 0)
 
+@frappe.whitelist()
+def get_my_xp() -> int:
+	return get_total_xp(frappe.session.user)
 
 def _add_to_total(user: str, amount: int) -> None:
 	"""Atomically add ``amount`` to the user's XP row (created if missing)."""
