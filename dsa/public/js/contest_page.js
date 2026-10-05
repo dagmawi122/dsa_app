@@ -1,4 +1,3 @@
-
 class ContestPage {
 	constructor(wrapper, contest_name) {
 		this.wrapper = wrapper;
@@ -72,25 +71,29 @@ class ContestPage {
                 </div>
             </div>
         `);
-        $(".back-to-home").on("click", () => {
-            window.location.href = "/lms";
-        });
+
+		$(".back-to-home").on("click", () => {
+			window.location.href = "/lms";
+		});
 	}
 
 	async load_contests() {
+		if (this.is_guest()) {
+			this.render_login_required(".contest-content");
+			return;
+		}
+
 		try {
 			const [contestsRes, myContestsRes] = await Promise.all([
 				frappe.call({
 					method: "dsa.api.get_contests",
 					args: { limit_start: 0, limit_page_length: 100 },
 				}),
-				frappe.session.user !== "Guest"
-					? frappe
-							.call({
-								method: "dsa.dsa.doctype.contest_registration.contest_registration.get_my_contests",
-							})
-							.catch(() => ({ message: [] }))
-					: Promise.resolve({ message: [] }),
+				frappe
+					.call({
+						method: "dsa.dsa.doctype.contest_registration.contest_registration.get_my_contests",
+					})
+					.catch(() => ({ message: [] })),
 			]);
 
 			const contests = contestsRes.message || [];
@@ -395,6 +398,11 @@ class ContestPage {
 	}
 
 	async load_contest() {
+		if (this.is_guest()) {
+			this.render_login_required(".contest-details-page");
+			return;
+		}
+
 		try {
 			const [contestRes, statusRes] = await Promise.all([
 				frappe.call({
@@ -414,20 +422,16 @@ class ContestPage {
 
 			const contest = contestRes.message;
 
-			const participantStatus =
-				statusRes.message || {
-					registered: false,
-				};
+			const participantStatus = statusRes.message || {
+				registered: false,
+			};
 
 			if (!contest) {
 				this.render_not_found();
 				return;
 			}
 
-			this.render_contest_details(
-				contest,
-				participantStatus
-			);
+			this.render_contest_details(contest, participantStatus);
 		} catch (error) {
 			console.error("Failed to load contest:", error);
 
@@ -447,11 +451,8 @@ class ContestPage {
 			contest.end_date
 		);
 
-		const problems = contest.problems || [];
-
 		const isRegistered =
-			participantStatus &&
-			participantStatus.registered;
+			participantStatus && participantStatus.registered;
 
 		const isEnded = type === "ended";
 
@@ -606,17 +607,6 @@ class ContestPage {
                         </div>
                     </div>
 
-                    <div class="info-card">
-                        <div class="info-card-icon">
-                            ${this.icon("code")}
-                        </div>
-
-                        <div>
-                            <span class="info-label">PROBLEMS</span>
-                            <strong>${problems.length}</strong>
-                        </div>
-                    </div>
-
                 </div>
 
             </section>
@@ -657,112 +647,11 @@ class ContestPage {
                 </div>
 
             </section>
-
-            <section class="details-section">
-
-                <div class="details-section-title">
-
-                    <span class="section-line"></span>
-
-                    <div>
-                        <h2>Contest Problems</h2>
-                        <p>
-                            Challenges prepared for this contest.
-                        </p>
-                    </div>
-
-                </div>
-
-                ${
-					problems.length
-						? `
-                    <div class="contest-problems">
-
-                        ${problems
-							.map(
-								(p, idx) => `
-                            <div
-                                class="problem-card"
-                                data-problem="${this.escape_html(
-									p.problem
-								)}"
-                            >
-
-                                <div class="problem-number">
-                                    ${String(idx + 1).padStart(
-										2,
-										"0"
-									)}
-                                </div>
-
-                                <div class="problem-main">
-
-                                    <div class="problem-title">
-                                        ${this.escape_html(
-											p.title || p.problem
-										)}
-                                    </div>
-
-                                    <div class="problem-meta">
-                                        Order:
-                                        ${p.order || idx + 1}
-                                    </div>
-
-                                </div>
-
-                                <div class="problem-points">
-
-                                    <span class="points-label">
-                                        POINTS
-                                    </span>
-
-                                    <strong>
-                                        ${p.points || 0}
-                                    </strong>
-
-                                </div>
-
-                                <div class="problem-arrow">
-                                    →
-                                </div>
-
-                            </div>
-                        `
-							)
-							.join("")}
-
-                    </div>
-                `
-						: `
-                    <div class="problems-placeholder">
-
-                        <div class="placeholder-icon">
-                            ${this.icon("lock")}
-                        </div>
-
-                        <h3>
-                            Problems hidden or not published
-                        </h3>
-
-                        <p>
-                            Contest problems will appear here once published.
-                        </p>
-
-                    </div>
-                `
-				}
-
-            </section>
-
-            
         `);
 
 		this.load_leaderboard();
 
-		this.bind_details_events(
-			contest,
-			isRegistered
-		);
+		this.bind_details_events(contest, isRegistered);
 	}
 
 	bind_details_events(contest, isRegistered) {
@@ -771,119 +660,81 @@ class ContestPage {
 		});
 
 		$(".contest-enter-btn").on("click", () => {
-            window.location.href = `/contest-comp/${encodeURIComponent(
-                this.contest_name
-            )}`;
-        });
+			window.location.href = `/contest-comp/${encodeURIComponent(
+				this.contest_name
+			)}`;
+		});
 
-		$(".problem-card").on("click", () => {
-            if (isRegistered) {
-                window.location.href = `/contest-comp/${encodeURIComponent(
-                    this.contest_name
-                )}`;
-            } else {
-                frappe.msgprint({
-                    title: __("Registration Required"),
-                    message: __(
-                        "Please join this contest first to access the challenges."
-                    ),
-                    indicator: "orange",
-                });
-            }
-        });
+		$(".contest-join-btn:not(.disabled)").on("click", async (event) => {
+			const btn = $(event.currentTarget);
 
-		$(".contest-join-btn:not(.disabled)").on(
-			"click",
-			async (event) => {
-				const btn = $(event.currentTarget);
+			btn.prop("disabled", true).text("Joining...");
 
-				btn.prop("disabled", true).text("Joining...");
+			try {
+				const res = await frappe.call({
+					method: "dsa.dsa.doctype.contest_registration.contest_registration.join_contest",
+					args: {
+						contest: this.contest_name,
+					},
+				});
 
-				try {
-					const res = await frappe.call({
-						method:
-							"dsa.dsa.doctype.contest_registration.contest_registration.join_contest",
-						args: {
-							contest: this.contest_name,
-						},
-					});
+				frappe.show_alert({
+					message:
+						res.message?.message ||
+						__("Successfully joined the contest!"),
+					indicator: "green",
+				});
 
-					frappe.show_alert({
-						message:
-							res.message?.message ||
-							__(
-								"Successfully joined the contest!"
-							),
-						indicator: "green",
-					});
+				window.location.href = `/contest-comp/${encodeURIComponent(
+					this.contest_name
+				)}`;
+			} catch (err) {
+				btn.prop("disabled", false).text("Join Contest");
 
-					window.location.href = `/contest-comp/${encodeURIComponent(
-                        this.contest_name
-                    )}`;
-				} catch (err) {
-					btn.prop("disabled", false).text(
-						"Join Contest"
-					);
+				const msg = err?.messages
+					? err.messages.join(" ")
+					: err?.message || __("Could not join contest.");
 
-					const msg = err?.messages
-						? err.messages.join(" ")
-						: err?.message ||
-						  __("Could not join contest.");
-
-					frappe.show_alert({
-						message: msg,
-						indicator: "red",
-					});
-				}
+				frappe.show_alert({
+					message: msg,
+					indicator: "red",
+				});
 			}
-		);
+		});
 
-		$(".contest-leave-btn").on(
-			"click",
-			async () => {
-				frappe.confirm(
-					__(
-						"Are you sure you want to leave this contest?"
-					),
-					async () => {
-						try {
-							const res =
-								await frappe.call({
-									method:
-										"dsa.dsa.doctype.contest_registration.contest_registration.leave_contest",
-									args: {
-										contest: this
-											.contest_name,
-									},
-								});
+		$(".contest-leave-btn").on("click", async () => {
+			frappe.confirm(
+				__("Are you sure you want to leave this contest?"),
+				async () => {
+					try {
+						const res = await frappe.call({
+							method: "dsa.dsa.doctype.contest_registration.contest_registration.leave_contest",
+							args: {
+								contest: this.contest_name,
+							},
+						});
 
-							frappe.show_alert({
-								message:
-									res.message?.message ||
-									__(
-										"You have left the contest."
-									),
-								indicator: "orange",
-							});
+						frappe.show_alert({
+							message:
+								res.message?.message ||
+								__("You have left the contest."),
+							indicator: "orange",
+						});
 
-							this.load_contest();
-						} catch (err) {
-							const msg = err?.messages
-								? err.messages.join(" ")
-								: err?.message ||
-								  __(
-										"Could not leave contest."
-								  );
+						this.load_contest();
+					} catch (err) {
+						const msg = err?.messages
+							? err.messages.join(" ")
+							: err?.message || __("Could not leave contest.");
 
-							frappe.show_alert({
-								message: msg,
-								indicator: "red",
-							});
-						}
+						frappe.show_alert({
+							message: msg,
+							indicator: "red",
+						});
 					}
-				);
-			}
-		);
+				}
+			);
+		});
 	}
 
 	async load_leaderboard() {
@@ -895,15 +746,11 @@ class ContestPage {
 				},
 			});
 
-			const leaderboard =
-				res.message?.leaderboard || [];
+			const leaderboard = res.message?.leaderboard || [];
 
 			this.render_leaderboard(leaderboard);
 		} catch (error) {
-			console.error(
-				"Failed to load leaderboard:",
-				error
-			);
+			console.error("Failed to load leaderboard:", error);
 
 			$(".contest-leaderboard").html(`
                 <div class="contest-state">
@@ -949,20 +796,13 @@ class ContestPage {
 		}
 
 		const format_solving_time = (seconds) => {
-			const total_seconds = Number(
-				seconds || 0
-			);
+			const total_seconds = Number(seconds || 0);
 
-			const hours = Math.floor(
-				total_seconds / 3600
-			);
+			const hours = Math.floor(total_seconds / 3600);
 
-			const minutes = Math.floor(
-				(total_seconds % 3600) / 60
-			);
+			const minutes = Math.floor((total_seconds % 3600) / 60);
 
-			const remaining_seconds =
-				total_seconds % 60;
+			const remaining_seconds = total_seconds % 60;
 
 			if (hours > 0) {
 				return `${hours}h ${minutes}m ${remaining_seconds}s`;
@@ -1009,8 +849,7 @@ class ContestPage {
                                 <td>
                                     <div class="leaderboard-user">
                                         ${this.escape_html(
-											row.full_name ||
-												row.member
+											row.full_name || row.member
 										)}
                                     </div>
                                 </td>
@@ -1048,6 +887,27 @@ class ContestPage {
         `);
 	}
 
+	is_guest() {
+		return frappe.session.user === "Guest";
+	}
+
+	render_login_required(selector) {
+		$(selector).html(`
+            <div class="contest-state">
+                <div class="state-icon">${this.icon("lock")}</div>
+                <h3>You're not logged in</h3>
+                <p>Please log in first to view contests.</p>
+                <button class="contest-retry contest-login-btn">Log In</button>
+            </div>
+        `);
+
+		$(".contest-login-btn").on("click", () => {
+			window.location.href =
+				"/login?redirect-to=" +
+				encodeURIComponent(window.location.pathname);
+		});
+	}
+
 	render_not_found() {
 		$(".contest-details-page").html(`
             <button class="back-to-contests">
@@ -1071,9 +931,8 @@ class ContestPage {
             </div>
         `);
 
-		$(".back-to-contests").on(
-			"click",
-			() => this.navigate("/contest-page", null)
+		$(".back-to-contests").on("click", () =>
+			this.navigate("/contest-page", null)
 		);
 	}
 
@@ -1104,15 +963,11 @@ class ContestPage {
             </div>
         `);
 
-		$(".back-to-contests").on(
-			"click",
-			() => this.navigate("/contest-page", null)
+		$(".back-to-contests").on("click", () =>
+			this.navigate("/contest-page", null)
 		);
 
-		$(".contest-retry").on(
-			"click",
-			() => this.load_contest()
-		);
+		$(".contest-retry").on("click", () => this.load_contest());
 	}
 
 	get_status_type(status) {
@@ -1144,9 +999,7 @@ class ContestPage {
 		if (!dateStr) return "—";
 
 		try {
-			return frappe.datetime.str_to_user(
-				dateStr
-			);
+			return frappe.datetime.str_to_user(dateStr);
 		} catch {
 			return dateStr;
 		}
@@ -1163,19 +1016,13 @@ class ContestPage {
 
 			if (diffMs <= 0) return "—";
 
-			const diffMins = Math.floor(
-				diffMs / (1000 * 60)
-			);
+			const diffMins = Math.floor(diffMs / (1000 * 60));
 
-			const hours = Math.floor(
-				diffMins / 60
-			);
+			const hours = Math.floor(diffMins / 60);
 
 			const mins = diffMins % 60;
 
-			const days = Math.floor(
-				hours / 24
-			);
+			const days = Math.floor(hours / 24);
 
 			const remHours = hours % 24;
 
@@ -1196,21 +1043,16 @@ class ContestPage {
 	strip_html(html) {
 		if (!html) return "";
 
-		return $("<div>")
-			.html(html)
-			.text()
-			.trim();
+		return $("<div>").html(html).text().trim();
 	}
 
 	escape_html(str) {
-		return frappe.utils.escape_html(
-			str || ""
-		);
+		return frappe.utils.escape_html(str || "");
 	}
 
 	icon(name) {
 		const icons = {
-            home: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>`,
+			home: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>`,
 			play: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
 			stop: `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>`,
 			check: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6"/></svg>`,
@@ -1227,8 +1069,8 @@ class ContestPage {
 		}</span>`;
 	}
 
-		add_styles() {
-        if (window.dsaTheme) window.dsaTheme.init();
+	add_styles() {
+		if (window.dsaTheme) window.dsaTheme.init();
 		if ($("#contest-page-styles").length) return;
 
 		$("head").append(`
@@ -1973,7 +1815,7 @@ body.dsa-standalone-website[data-theme="dark"] {
 
 .details-info-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 14px;
 }
 
@@ -2054,79 +1896,6 @@ body.dsa-standalone-website[data-theme="dark"] {
 
 .contest-description-full p:last-child {
     margin-bottom: 0;
-}
-
-.contest-problems {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.problem-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: var(--card-shadow);
-}
-
-.problem-card:hover {
-    border-color: var(--accent);
-    transform: translateX(4px);
-    box-shadow: var(--card-shadow-hover);
-}
-
-.problem-number {
-    font-family: var(--font-stack-monospace, monospace);
-    font-size: 13px;
-    font-weight: 800;
-    color: var(--accent);
-    width: 32px;
-}
-
-.problem-main {
-    flex: 1;
-}
-
-.problem-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-color);
-}
-
-.problem-meta {
-    font-size: 11px;
-    color: var(--text-muted);
-}
-
-.problem-points {
-    text-align: right;
-}
-
-.points-label {
-    display: block;
-    font-size: 9px;
-    color: var(--text-muted);
-    font-weight: 700;
-}
-
-.problem-points strong {
-    color: var(--accent);
-    font-size: 13px;
-}
-
-.problem-arrow {
-    color: var(--text-muted);
-    font-size: 16px;
-}
-
-.problem-card:hover .problem-arrow {
-    color: var(--accent);
 }
 
 .problems-placeholder {

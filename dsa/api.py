@@ -2491,43 +2491,193 @@ def _estimate_time_complexity(code: str, language_id: int) -> str:
     return "O(1)"
 
 def _estimate_space_complexity(code: str) -> str:
+    """
+    Estimate auxiliary space complexity from submitted code.
+
+    This is intentionally a heuristic rather than a full static analyzer.
+
+    Returns:
+        O(1) - constant auxiliary space
+        O(log n) - logarithmic auxiliary space
+        O(n) - linear or potentially larger auxiliary space
+    """
+
+    # ---------------------------------------------------------
+    # 1. Remove comments
+    # ---------------------------------------------------------
     code = re.sub(r"//.*", "", code)
     code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+    code = re.sub(r"#.*", "", code)
 
-    if re.search(
-        r"\b(vector|deque|list|set|unordered_set|map|unordered_map)\s*"
-        r"<[^;]+>\s+\w+\s*(?:\([^;]*\))?\s*;",
-        code,
-    ):
-        return "O(n)"
+    # Normalize whitespace
+    normalized = re.sub(r"\s+", " ", code).strip()
 
-    if re.search(
-        r"\b(vector|deque|list|set|unordered_set|map|unordered_map)\s*"
-        r"<[^;]+>\s+\w+\s*;",
-        code,
-    ):
-        return "O(n)"
+    # ---------------------------------------------------------
+    # 2. Python: containers that can grow with input
+    # ---------------------------------------------------------
 
-    if re.search(
-        r"\b(new|malloc|calloc|realloc)\s*\(",
-        code,
-    ):
-        return "O(n)"
+    python_dynamic_patterns = [
+        # list / set / dict construction
+        r"\blist\s*\(",
+        r"\bset\s*\(",
+        r"\bdict\s*\(",
 
-    function_match = re.search(
-        r"\b(?:int|void|bool|string|long|double|float|char)\s+"
-        r"(\w+)\s*\([^)]*\)\s*\{",
-        code,
+        # dictionary / set / list literals
+        r"\{[^}]*:",
+        r"\{[^}]*\}",
+
+        # list / set / dict comprehensions
+        r"\[[^\]]*\bfor\b[^\]]*\bin\b",
+        r"\{[^}]*\bfor\b[^}]*\bin\b",
+
+        # append / extend / insert into a collection
+        r"\.\s*append\s*\(",
+        r"\.\s*extend\s*\(",
+        r"\.\s*insert\s*\(",
+        r"\.\s*add\s*\(",
+
+        # dictionary assignment
+        r"\[[^\]]+\]\s*=",
+
+        # common Python containers
+        r"\bcollections\.(?:deque|defaultdict|Counter)\s*\(",
+        r"\bdeque\s*\(",
+        r"\bdefaultdict\s*\(",
+        r"\bCounter\s*\(",
+    ]
+
+    for pattern in python_dynamic_patterns:
+        if re.search(pattern, code):
+            return "O(n)"
+
+    # ---------------------------------------------------------
+    # 3. C++ containers
+    # ---------------------------------------------------------
+
+    cpp_containers = (
+        r"\b(?:vector|deque|list|set|multiset|unordered_set|"
+        r"map|multimap|unordered_map|queue|priority_queue|stack)\b"
     )
 
-    if function_match:
-        function_name = function_match.group(1)
+    # Container declaration:
+    # vector<int> nums;
+    # unordered_set<int> seen;
+    # vector<int> nums(n);
+    if re.search(
+        cpp_containers +
+        r"\s*(?:<[^;{}]+>)?\s+\w+\s*(?:\([^;{}]*\))?\s*;",
+        code
+    ):
+        return "O(n)"
 
+    # C-style arrays whose size depends on a variable
+    # int arr[n];
+    # bool visited[n];
+    if re.search(
+        r"\b(?:int|long|long long|double|float|char|bool)\s+"
+        r"\w+\s*\[\s*[A-Za-z_]\w*\s*\]\s*;",
+        code
+    ):
+        return "O(n)"
+
+    # ---------------------------------------------------------
+    # 4. Dynamic allocation
+    # ---------------------------------------------------------
+
+    if re.search(
+        r"\b(?:new|malloc|calloc|realloc)\b",
+        code
+    ):
+        return "O(n)"
+
+    # ---------------------------------------------------------
+    # 5. Python assignment of a growing sequence
+    # ---------------------------------------------------------
+
+    # nums = [...]
+    # values = list(...)
+    # seen = set(...)
+    if re.search(
+        r"\b\w+\s*=\s*(?:"
+        r"\[[^\]]*\]"
+        r"|\{[^}]*\}"
+        r"|list\s*\("
+        r"|set\s*\("
+        r"|dict\s*\("
+        r"|deque\s*\("
+        r"|Counter\s*\("
+        r")",
+        code
+    ):
+        return "O(n)"
+
+    # ---------------------------------------------------------
+    # 6. Recursion
+    # ---------------------------------------------------------
+
+    # Try to identify the main function/method.
+    function_patterns = [
+        # C++:
+        # int foo(...)
+        # void foo(...)
+        # bool foo(...)
+        # string foo(...)
+        r"\b(?:int|void|bool|string|long|double|float|char)\s+"
+        r"([A-Za-z_]\w*)\s*\([^)]*\)\s*\{",
+
+        # Python:
+        # def foo(...):
+        r"\bdef\s+([A-Za-z_]\w*)\s*\([^)]*\)\s*:",
+    ]
+
+    function_name = None
+    function_end = 0
+
+    for pattern in function_patterns:
+        match = re.search(pattern, code)
+        if match:
+            function_name = match.group(1)
+            function_end = match.end()
+            break
+
+    if function_name:
+        function_body = code[function_end:]
+
+        # Function calls itself.
         if re.search(
             rf"\b{re.escape(function_name)}\s*\(",
-            code[function_match.end():],
+            function_body
         ):
-            return "O(n)"
+            return "O(log n)"
+
+    # ---------------------------------------------------------
+    # 7. Explicit recursion patterns
+    # ---------------------------------------------------------
+
+    # Python recursive call
+    if re.search(
+        r"\breturn\s+\w+\s*\([^)]*\)\s*$",
+        code,
+        flags=re.MULTILINE
+    ):
+        # Don't automatically classify every return-call as recursion.
+        # Only do so when a function name appears more than once.
+        defs = re.findall(
+            r"\bdef\s+([A-Za-z_]\w*)\s*\(",
+            code
+        )
+
+        for name in defs:
+            occurrences = len(
+                re.findall(rf"\b{re.escape(name)}\s*\(", code)
+            )
+
+            if occurrences > 1:
+                return "O(log n)"
+
+    # ---------------------------------------------------------
+    # 8. Otherwise assume constant auxiliary space
+    # ---------------------------------------------------------
 
     return "O(1)"
 
