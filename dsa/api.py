@@ -457,23 +457,22 @@ def _contest_payload(contest, current_time=None, include_problems=False) -> dict
 
 @frappe.whitelist()
 def get_contests(limit_start: int = 0, limit_page_length: int = 20) -> list[dict[str, Any]]:
-	"""List contests in chronological order with status calculated at request time."""
-	_require_login()
+    """List contests in chronological order with status calculated at request time."""
 
-	limit_start = max(cint(limit_start), 0)
-	limit_page_length = min(max(cint(limit_page_length), 1), 100)
+    limit_start = max(cint(limit_start), 0)
+    limit_page_length = min(max(cint(limit_page_length), 1), 100)
 
-	current_time = now_datetime()
+    current_time = now_datetime()
 
-	contests = frappe.get_all(
-		"Contest",
-		fields=["name", "title", "description", "start_date", "end_date"],
-		order_by="start_date asc",
-		offset=limit_start,
-		limit=limit_page_length,
-	)
+    contests = frappe.get_all(
+        "Contest",
+        fields=["name", "title", "description", "start_date", "end_date"],
+        order_by="start_date asc",
+        offset=limit_start,
+        limit=limit_page_length,
+    )
 
-	return [_contest_payload(contest, current_time) for contest in contests]
+    return [_contest_payload(contest, current_time) for contest in contests]
 
 
 @frappe.whitelist()
