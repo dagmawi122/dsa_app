@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-10-03 09:02:26.404520",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "unlock_key",
+  "user",
+  "problem",
+  "xp_deducted",
+  "unlocked_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "unlock_key",
+   "fieldtype": "Data",
+   "label": "unlock_key",
+   "unique": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "problem",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Problem",
+   "options": "DSAProblem",
+   "reqd": 1
+  },
+  {
+   "fieldname": "xp_deducted",
+   "fieldtype": "Int",
+   "label": "xp_deducted"
+  },
+  {
+   "fieldname": "unlocked_at",
+   "fieldtype": "Datetime",
+   "label": "unlocked_at"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-11 21:35:45.646158",
+ "modified_by": "Administrator",
+ "module": "DSA",
+ "name": "DSA Solution Unlock",
+ "owner": "eyuelcherenet332@gmail.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
