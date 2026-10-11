@@ -278,9 +278,15 @@
 	function init(opts) {
 		opts = opts || {};
 
+		// Do not apply the DSA theme to Frappe's login
+		// page or other non-DSA website pages.
+		if (!isDsaThemePage()) {
+			return;
+		}
+
 		injectStyles();
 
-		if (!opts.hideToggle && isDsaThemePage()) {
+		if (!opts.hideToggle) {
 			injectButton();
 		}
 
