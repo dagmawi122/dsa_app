@@ -77,6 +77,31 @@
 							>
 								<span class="dsa-tab-icon blue">↶</span>{{ __("Submissions") }}
 							</button>
+
+							<button
+								v-if="!props.contestMode"
+								type="button"
+								class="dsa-tab"
+								:class="{ 'is-active': activeProblemTab === 'solution' }"
+								@click="selectProblemTab('solution')"
+							>
+								<svg
+									class="dsa-solution-tab-icon"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M9 3h6" />
+									<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+									<path d="M8 14h8" />
+									<path d="M9.5 17h5" />
+								</svg>
+								{{ __("Solution") }}
+							</button>
 						</nav>
 
 						<div v-if="activeProblemTab === 'description'" class="dsa-statement">
@@ -142,6 +167,132 @@
                                 <h3>{{ __("Hint") }}</h3>
                                 <div class="dsa-rich-text" v-html="safeHint"></div>
                             </section>
+						</div>
+
+						<!-- Official Solution (read-only viewer; never Monaco, never v-html) -->
+						<div
+							v-else-if="activeProblemTab === 'solution'"
+							class="dsa-solution-output dsa-solution-tab"
+						>
+							<div
+								v-if="solutionLoading"
+								class="dsa-solution-state"
+								role="status"
+								aria-live="polite"
+							>
+								<svg
+									class="dsa-solution-state-icon"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M9 3h6" />
+									<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+									<path d="M8 14h8" />
+									<path d="M9.5 17h5" />
+								</svg>
+								<strong>{{ __("Opening solution…") }}</strong>
+								<span>{{ __("Please wait") }}</span>
+								<span class="dsa-solution-spinner" aria-hidden="true"></span>
+							</div>
+
+							<div
+								v-else-if="solutionError"
+								class="dsa-solution-state is-error"
+								role="alert"
+							>
+								<strong>{{ solutionErrorTitle }}</strong>
+								<p>{{ solutionError }}</p>
+								<button
+									v-if="solutionErrorKind !== 'unavailable'"
+									type="button"
+									class="dsa-solution-button"
+									@click="retrySolution"
+								>
+									{{ __("Retry") }}
+								</button>
+							</div>
+
+							<div
+								v-else-if="solutionUnlocked && solutionContent"
+								class="dsa-solution-viewer"
+							>
+								<div class="dsa-solution-header">
+									<div>
+										<div class="dsa-solution-title">
+											<svg
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="1.8"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												aria-hidden="true"
+											>
+												<path d="M9 3h6" />
+												<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+												<path d="M8 14h8" />
+												<path d="M9.5 17h5" />
+											</svg>
+											{{ __("Official Solution") }}
+										</div>
+										<div class="dsa-solution-subtitle">
+											{{ __("Editorial implementation") }}
+										</div>
+									</div>
+
+									<span class="dsa-solution-language">{{
+										solutionLanguageLabel
+									}}</span>
+								</div>
+
+								<div
+									class="dsa-solution-code"
+									tabindex="0"
+									role="region"
+									:aria-label="__('Official solution code')"
+								><pre><code>{{ solutionContent }}</code></pre></div>
+							</div>
+
+							<div v-else class="dsa-solution-state">
+								<svg
+									class="dsa-solution-state-icon"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M9 3h6" />
+									<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
+									<path d="M8 14h8" />
+									<path d="M9.5 17h5" />
+								</svg>
+								<strong>{{
+									solutionFree
+										? __("Official Solution")
+										: __("Official Solution is locked")
+								}}</strong>
+								<span v-if="!solutionFree && solutionCost > 0">
+									{{ __("Unlock it once for") }} {{ solutionCost }} XP
+								</span>
+								<span v-else-if="solutionFree && problem.solved && !solutionUnlocked">
+									{{ __("Free — you already solved this problem") }}
+								</span>
+								<button
+									type="button"
+									class="dsa-solution-button is-primary"
+									@click="solutionFree ? requestSolution() : openSolutionConfirm()"
+								>
+									{{ solutionFree ? __("View Solution") : __("Unlock Solution") }}
+								</button>
+							</div>
 						</div>
 
 						<div v-else class="dsa-tab-content">
@@ -332,7 +483,12 @@
 						<span></span>
 					</div>
 
-					<div class="dsa-pane dsa-solution">
+					<div
+						ref="rightPane"
+						class="dsa-pane dsa-solution"
+						:class="{ 'is-resizing-row': resizingRow }"
+						:style="rightPaneStyle"
+					>
 						<div class="dsa-code-panel">
 							<div class="dsa-panel-title">
 								<strong>
@@ -432,33 +588,24 @@
 							</div>
 						</div>
 
+						<!-- Horizontal resizer between the editor and the terminal -->
+						<div
+							class="dsa-resizer dsa-resizer-horizontal"
+							role="separator"
+							aria-orientation="horizontal"
+							aria-valuemin="20"
+							aria-valuemax="80"
+							:aria-valuenow="Math.round(editorHeight)"
+							tabindex="0"
+							@pointerdown="startRowResize"
+							@keydown="resizeRowWithKeyboard"
+						>
+							<span></span>
+						</div>
+
 						<div class="dsa-terminal">
 							<div class="dsa-terminal-header">
 								<div class="dsa-result-tabs">
-									<button
-										v-if="!props.contestMode"
-										type="button"
-										:class="{ 'is-active': activeResultTab === 'solution' }"
-										@click="selectSolutionTab"
-									>
-										<svg
-											class="dsa-solution-tab-icon"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="1.8"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											aria-hidden="true"
-										>
-											<path d="M9 3h6" />
-											<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
-											<path d="M8 14h8" />
-											<path d="M9.5 17h5" />
-										</svg>
-										{{ __("Solution") }}
-									</button>
-
 									<button
 										type="button"
 										:class="{ 'is-active': activeResultTab === 'testcase' }"
@@ -491,134 +638,8 @@
 							</div>
 
 							<div class="dsa-terminal-output">
-								<!-- Official Solution (read-only viewer; never Monaco, never v-html) -->
 								<div
-									v-if="activeResultTab === 'solution'"
-									class="dsa-solution-output"
-								>
-									<div
-										v-if="solutionLoading"
-										class="dsa-solution-state"
-										role="status"
-										aria-live="polite"
-									>
-										<svg
-											class="dsa-solution-state-icon"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="1.8"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											aria-hidden="true"
-										>
-											<path d="M9 3h6" />
-											<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
-											<path d="M8 14h8" />
-											<path d="M9.5 17h5" />
-										</svg>
-										<strong>{{ __("Opening solution…") }}</strong>
-										<span>{{ __("Please wait") }}</span>
-										<span class="dsa-solution-spinner" aria-hidden="true"></span>
-									</div>
-
-									<div
-										v-else-if="solutionError"
-										class="dsa-solution-state is-error"
-										role="alert"
-									>
-										<strong>{{ solutionErrorTitle }}</strong>
-										<p>{{ solutionError }}</p>
-										<button
-											v-if="solutionErrorKind !== 'unavailable'"
-											type="button"
-											class="dsa-solution-button"
-											@click="retrySolution"
-										>
-											{{ __("Retry") }}
-										</button>
-									</div>
-
-									<div
-										v-else-if="solutionUnlocked && solutionContent"
-										class="dsa-solution-viewer"
-									>
-										<div class="dsa-solution-header">
-											<div>
-												<div class="dsa-solution-title">
-													<svg
-														viewBox="0 0 24 24"
-														fill="none"
-														stroke="currentColor"
-														stroke-width="1.8"
-														stroke-linecap="round"
-														stroke-linejoin="round"
-														aria-hidden="true"
-													>
-														<path d="M9 3h6" />
-														<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
-														<path d="M8 14h8" />
-														<path d="M9.5 17h5" />
-													</svg>
-													{{ __("Official Solution") }}
-												</div>
-												<div class="dsa-solution-subtitle">
-													{{ __("Editorial implementation") }}
-												</div>
-											</div>
-
-											<span class="dsa-solution-language">{{
-												solutionLanguageLabel
-											}}</span>
-										</div>
-
-										<div
-											class="dsa-solution-code"
-											tabindex="0"
-											role="region"
-											:aria-label="__('Official solution code')"
-										><pre><code>{{ solutionContent }}</code></pre></div>
-									</div>
-
-									<div v-else class="dsa-solution-state">
-										<svg
-											class="dsa-solution-state-icon"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="1.8"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											aria-hidden="true"
-										>
-											<path d="M9 3h6" />
-											<path d="M10 3v4l-4.5 8.5A3.5 3.5 0 0 0 8.6 21h6.8a3.5 3.5 0 0 0 3.1-5.5L14 7V3" />
-											<path d="M8 14h8" />
-											<path d="M9.5 17h5" />
-										</svg>
-										<strong>{{
-											solutionFree
-												? __("Official Solution")
-												: __("Official Solution is locked")
-										}}</strong>
-										<span v-if="!solutionFree && solutionCost > 0">
-											{{ __("Unlock it once for") }} {{ solutionCost }} XP
-										</span>
-										<span v-else-if="solutionFree && problem.solved && !solutionUnlocked">
-											{{ __("Free — you already solved this problem") }}
-										</span>
-										<button
-											type="button"
-											class="dsa-solution-button is-primary"
-											@click="solutionFree ? requestSolution() : openSolutionConfirm()"
-										>
-											{{ solutionFree ? __("View Solution") : __("Unlock Solution") }}
-										</button>
-									</div>
-								</div>
-
-								<div
-									v-else-if="activeResultTab === 'testcase'"
+									v-if="activeResultTab === 'testcase'"
 									class="dsa-testcase-input"
 								>
 									<div class="dsa-case-tabs">
@@ -1001,17 +1022,17 @@ const props = defineProps({
 });
 
 const languages = [
+    {
+		id: 71,
+		label: "Python 3",
+		monaco: "python",
+		starter: "# Write your Python solution here\n",
+	},
 	{
 		id: 54,
 		label: "C++",
 		monaco: "cpp",
 		starter: "// Write your C++ solution here\n",
-	},
-	{
-		id: 71,
-		label: "Python 3",
-		monaco: "python",
-		starter: "# Write your Python solution here\n",
 	},
 	{
 		id: 63,
@@ -1027,12 +1048,14 @@ const languages = [
 	},
 ];
 
+const DEFAULT_LANGUAGE_ID = 71;
+
 const loading = ref(true);
 const problem = ref(null);
 const code = ref("");
 const busy = ref(false);
 const terminalOutput = ref("");
-const selectedLanguageId = ref(54);
+const selectedLanguageId = ref(DEFAULT_LANGUAGE_ID);
 const contestBackLink = computed(() =>
     props.contestName ? `/contest-page/${props.contestName}` : "/list-problems"
 );
@@ -1060,6 +1083,12 @@ const resizing = ref(false);
 const contestProgress = ref(null);
 const contestProgressLoading = ref(false);
 const submissionMade = ref(false);
+
+// Vertical split between the Monaco editor (top) and the terminal (bottom).
+// editorHeight is the editor's share of the right pane, in percent.
+const rightPane = ref(null);
+const editorHeight = ref(55);
+const resizingRow = ref(false);
 
 // --- XP (display only) --------------------------------------------------
 // The backend decides everything about XP. These refs only hold what the
@@ -1090,7 +1119,7 @@ let solutionRequestId = 0;
 
 let generation = 0;
 let nextTestCaseKey = 2;
-let previousLanguageId = 54;
+let previousLanguageId = DEFAULT_LANGUAGE_ID;
 let codeDrafts = {};
 
 const safeDescription = computed(() => sanitize(problem.value?.description));
@@ -1103,6 +1132,10 @@ const safeHint = computed(() => sanitize(problem.value?.hint));
 
 const panelStyle = computed(() => ({
 	"--left-panel-width": `${leftPanelWidth.value}%`,
+}));
+
+const rightPaneStyle = computed(() => ({
+	"--editor-height": `${editorHeight.value}%`,
 }));
 
 const selectedLanguage = computed(
@@ -1538,7 +1571,7 @@ async function checkSolutionUnlock(problemName) {
 		// The user clicked Solution before this answer arrived.
 		if (
 			solutionUnlocked.value &&
-			activeResultTab.value === "solution" &&
+			activeProblemTab.value === "solution" &&
 			!solutionLoading.value &&
 			!solutionContent.value
 		) {
@@ -1579,7 +1612,7 @@ function retrySolution() {
 }
 
 function selectSolutionTab() {
-	activeResultTab.value = "solution";
+	activeProblemTab.value = "solution";
 
 	if (solutionLoading.value) return;
 
@@ -1633,7 +1666,6 @@ async function requestSolution() {
 		solutionUnlocked.value = true;
 		if (result.solved && problem.value) problem.value.solved = true;
 		showSolutionConfirm.value = false;
-		activeResultTab.value = "solution";
 
 		// Display only: the backend already deducted the XP.
 		const remaining = Number(result.remaining_xp);
@@ -1681,7 +1713,7 @@ watch(selectedLanguageId, () => {
 	solutionError.value = "";
 	solutionErrorKind.value = "";
 
-	if (activeResultTab.value === "solution" && solutionFree.value && problem.value) {
+	if (activeProblemTab.value === "solution" && solutionFree.value && problem.value) {
 		requestSolution();
 	}
 });
@@ -1693,6 +1725,11 @@ watch(showSolutionConfirm, (isOpen) => {
 });
 
 async function selectProblemTab(tab) {
+	if (tab === "solution") {
+		selectSolutionTab();
+		return;
+	}
+
 	activeProblemTab.value = tab;
 
 	if (tab === "submissions") {
@@ -1774,6 +1811,10 @@ function loadSubmissionCode(submission) {
 	}
 }
 
+// ---------------------------------------------------------------------
+// Resizing: left/right (problem vs. code) and top/bottom (editor vs. terminal)
+// ---------------------------------------------------------------------
+
 function setPanelWidth(clientX) {
 	const bounds = practiceShell.value?.getBoundingClientRect();
 
@@ -1823,6 +1864,59 @@ function resizeWithKeyboard(event) {
 	leftPanelWidth.value = Math.min(72, Math.max(28, leftPanelWidth.value + direction * 2));
 
 	monacoEditor.value?.layout();
+}
+
+function setEditorHeight(clientY) {
+	const bounds = rightPane.value?.getBoundingClientRect();
+
+	if (!bounds || !bounds.height) return;
+
+	editorHeight.value = Math.min(
+		80,
+		Math.max(20, ((clientY - bounds.top) / bounds.height) * 100)
+	);
+
+	monacoEditor.value?.layout();
+}
+
+function handleRowResize(event) {
+	setEditorHeight(event.clientY);
+}
+
+function stopRowResize() {
+	resizingRow.value = false;
+
+	document.body.classList.remove("dsa-resizing-row");
+
+	window.removeEventListener("pointermove", handleRowResize);
+	window.removeEventListener("pointerup", stopRowResize);
+
+	nextTick(() => monacoEditor.value?.layout());
+}
+
+function startRowResize(event) {
+	if (window.matchMedia("(max-width: 900px)").matches) return;
+
+	event.preventDefault();
+
+	resizingRow.value = true;
+
+	document.body.classList.add("dsa-resizing-row");
+
+	window.addEventListener("pointermove", handleRowResize);
+	window.addEventListener("pointerup", stopRowResize);
+}
+
+function resizeRowWithKeyboard(event) {
+	if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+
+	event.preventDefault();
+
+	const direction = event.key === "ArrowUp" ? -1 : 1;
+
+	editorHeight.value = Math.min(80, Math.max(20, editorHeight.value + direction * 2));
+
+	nextTick(() => monacoEditor.value?.layout());
 }
 
 async function call(method, args = {}, type = "GET") {
@@ -1875,14 +1969,14 @@ async function loadProblem(name, slug = null) {
 	problem.value = loadedProblem;
 	updatePageTitle();
 
-	selectedLanguageId.value = 54;
-	previousLanguageId = 54;
+	selectedLanguageId.value = DEFAULT_LANGUAGE_ID;
+	previousLanguageId = DEFAULT_LANGUAGE_ID;
 
 	codeDrafts = Object.fromEntries(
 		Object.entries(problem.value.starter_codes || {}).filter(([, starterCode]) => starterCode)
 	);
 
-	code.value = codeDrafts[54] || problem.value.starter_code || languages[0].starter;
+	code.value = codeDrafts[DEFAULT_LANGUAGE_ID] || languages[0].starter;
 
 	testCases.value = (problem.value.test_cases || []).map((testCase) => ({
 		key: nextTestCaseKey++,
@@ -2256,6 +2350,7 @@ onBeforeUnmount(() => {
 	disposed = true;
 	generation += 1;
 	stopResize();
+	stopRowResize();
 	clearInterval(timerInterval);
 	clearTimeout(xpToastTimer);
 });
@@ -2845,10 +2940,36 @@ function formatMemory(memory) {
 	opacity: 1;
 }
 
+/* Horizontal resizer between the editor and the terminal */
+.dsa-resizer-horizontal {
+	cursor: row-resize;
+}
+
+.dsa-resizer-horizontal::before {
+	width: 100%;
+	height: 2px;
+}
+
+.dsa-resizer-horizontal span {
+	width: 42px;
+	height: 3px;
+}
+
+.is-resizing-row .dsa-resizer-horizontal::before {
+	background: #4b8bf5;
+}
+
+.is-resizing-row .dsa-resizer-horizontal span {
+	opacity: 1;
+}
+
 .dsa-solution {
 	display: grid;
-	grid-template-rows: minmax(300px, 55%) minmax(150px, 1fr);
-	gap: 10px;
+	grid-template-rows:
+		minmax(150px, var(--editor-height, 55%))
+		10px
+		minmax(120px, 1fr);
+	gap: 0;
 	border: 0;
 	border-radius: 0;
 	background: var(--bg-color);
@@ -3396,6 +3517,8 @@ function formatMemory(memory) {
 
 	.dsa-solution {
 		height: 700px;
+		grid-template-rows: minmax(300px, 55%) minmax(150px, 1fr);
+		gap: 10px;
 	}
 }
 
@@ -3566,27 +3689,32 @@ function formatMemory(memory) {
    OFFICIAL SOLUTION
    Solution-specific styles only. Colors come from the existing theme
    variables, so light/dark follow the rest of the page.
+   The Solution now lives in the left pane, as a tab beside Submissions.
    ============================================================ */
 
-/* Tab icon: inherits the tab color, turns blue when the tab is active. */
+/* Tab icon: inherits the tab color, blue like the other left-pane tab icons. */
 .dsa-solution-tab-icon {
 	width: 14px;
 	height: 14px;
 	flex-shrink: 0;
-	color: inherit;
-}
-
-.dsa-result-tabs > button.is-active .dsa-solution-tab-icon {
 	color: var(--text-on-blue);
 }
 
-/* Terminal content */
+/* Left-pane content area for the Solution tab */
 .dsa-solution-output {
 	display: flex;
 	height: 100%;
 	min-height: 120px;
 	flex-direction: column;
 	font-family: var(--font-stack);
+}
+
+.dsa-solution-output.dsa-solution-tab {
+	height: auto;
+	min-height: 0;
+	flex: 1;
+	overflow: hidden;
+	padding: 14px 16px;
 }
 
 .dsa-solution-viewer {
@@ -3987,6 +4115,11 @@ body.dsa-focus-mode .dsa-editor-page .layout-main-section {
 
 body.dsa-resizing {
     cursor: col-resize !important;
+    user-select: none !important;
+}
+
+body.dsa-resizing-row {
+    cursor: row-resize !important;
     user-select: none !important;
 }
 
